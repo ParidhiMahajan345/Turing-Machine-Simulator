@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Turing Quest — Unary Addition TM</title>
+
+<style>
+:root{
+  --bg1:#02060a; --bg2:#07121a;
+  --accent:#00d4ff; --accent2:#8b5cf6;
+  font-family:Inter, Arial, sans-serif;
+}
+html,body{
+  margin:0; height:100%;
+  background:linear-gradient(135deg,var(--bg1),var(--bg2));
+  color:white;
+}
+header{
+  padding:18px;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+}
+.logo{
+  font-size:20px;
+  font-weight:900;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;
+  color:transparent;
+}
+.container{
+  max-width:1300px;
+  margin:20px auto;
+  padding:0 20px;
+}
+.tape-box{
+  background:rgba(0,0,0,0.35);
+  padding:16px;
+  border-radius:14px;
+  margin-bottom:16px;
+}
+.tape-row{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.cell{
+  width:42px;
+  height:42px;
+  border-radius:8px;
+  background:rgba(255,255,255,0.08);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:monospace;
+  font-size:18px;
+}
+.cell.active{
+  background:#00d4ff;
+  color:#021019;
+  font-weight:bold;
+}
+canvas{
+  background:rgba(0,0,0,0.35);
+  border-radius:12px;
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+}
+th,td{
+  border:1px solid #00d4ff;
+  padding:4px;
+  text-align:center;
+  font-size:14px;
+}
+th{
+  background:rgba(0,212,255,0.2);
+}
+#completionPopup{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  font-size:26px;
+  font-weight:bold;
+  color:#00d4ff;
+  background:rgba(0,0,0,0.6);
+}
+</style>
+</head>
+
+<body>
+<header>
+  <div class="logo">Turing Quest — Unary Addition</div>
+</header>
+
+<div class="container">
+
+<div class="tape-box">
+  <b>Input Tape</b>
+  <div class="tape-row" id="inputTape"></div>
+
+  <b style="display:block;margin-top:10px">Output Tape</b>
+  <div class="tape-row" id="outputTape"></div>
+
+  <div style="margin-top:10px">
+    Manual Input (Unary Addition):
+    <input id="manualInput" placeholder="11#1">
+    <button onclick="loadInput()">Load</button>
+    <button onclick="runMachine()">Run Machine</button>
+  </div>
+</div>
+
+<div class="tape-box">
+  <b>Transition Table</b>
+  <table>
+    <thead>
+      <tr>
+        <th>From</th><th>To</th><th>Read</th><th>Write</th><th>Move</th>
+      </tr>
+    </thead>
+    <tbody id="transitionBody"></tbody>
+  </table>
+</div>
+
+<canvas id="canvas" width="1100" height="520"></canvas>
+
+<div id="completionPopup">TM COMPLETED</div>
+</div>
+
+<script>
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
+
+let states=[], transitions=[];
+let inputTapeData=[], outputTapeData=[];
+let head=0, currentState="q0", timer=null;
+let stateCounter=0;
+const R=28;
+
+/* ================= DRAW ================= */
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  /* ---------- DRAW TRANSITIONS ---------- */
+  transitions.forEach(t=>{
+    const from = states.find(s=>s.name===t.from);
+    const to   = states.find(s=>s.name===t.to);
+    if(!from || !to) return;
+
+    ctx.strokeStyle="#00d4ff";
+    ctx.lineWidth=2;
+
+    // self-loop
+    if(from === to){
+  ctx.beginPath();
+  ctx.arc(from.x, from.y-55, 32, 0.3*Math.PI, 2.7*Math.PI);
+  ctx.stroke();
+
+  // label ABOVE the loop (centered)
+  ctx.font = "13px monospace";
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(0,0,0,0.8)";
+  ctx.strokeText(
+    `${t.read}/${t.write},${t.move}`,
+    from.x - 28,
+    from.y - 95
+  );
+  ctx.fillStyle = "#00d4ff";
+  ctx.fillText(
+    `${t.read}/${t.write},${t.move}`,
+    from.x - 28,
+    from.y - 95
+  );
+  return;
+}
+
+
+    // normal arrow
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const angle = Math.atan2(dy, dx);
+
+    const sx = from.x + R*Math.cos(angle);
+    const sy = from.y + R*Math.sin(angle);
+    const ex = to.x   - R*Math.cos(angle);
+    const ey = to.y   - R*Math.sin(angle);
+
+    ctx.beginPath();
+    ctx.moveTo(sx,sy);
+    ctx.lineTo(ex,ey);
+    ctx.stroke();
+
+    // arrow head
+    ctx.beginPath();
+    ctx.moveTo(ex,ey);
+    ctx.lineTo(
+      ex-10*Math.cos(angle-Math.PI/6),
+      ey-10*Math.sin(angle-Math.PI/6)
+    );
+    ctx.lineTo(
+      ex-10*Math.cos(angle+Math.PI/6),
+      ey-10*Math.sin(angle+Math.PI/6)
+    );
+    ctx.closePath();
+    ctx.fillStyle="#00d4ff";
+    ctx.fill();
+
+    // label
+    ctx.fillStyle="#00d4ff";
+    ctx.fillText(
+      `${t.read}/${t.write},${t.move}`,
+      (sx+ex)/2,
+      (sy+ey)/2 - 8
+    );
+  });
+
+  /* ---------- DRAW STATES ---------- */
+  states.forEach(s=>{
+    ctx.fillStyle=(s.name===currentState)?"#00ff80":"#00d4ff";
+    ctx.beginPath();
+    ctx.arc(s.x,s.y,R,0,Math.PI*2);
+    ctx.fill();
+
+    if(s.final){
+      ctx.strokeStyle="#021019";
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,R-6,0,Math.PI*2);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle="#021019";
+    ctx.fillText(s.name,s.x-8,s.y+4);
+  });
+}
+
+/* ================= TAPE ================= */
+function renderTape(){
+  inputTape.innerHTML="";
+  outputTape.innerHTML="";
+  inputTapeData.forEach(c=>{
+    const d=document.createElement("div");
+    d.className="cell";
+    d.textContent=c;
+    inputTape.appendChild(d);
+  });
+  outputTapeData.forEach((c,i)=>{
+    const d=document.createElement("div");
+    d.className="cell"+(i===head?" active":"");
+    d.textContent=c;
+    outputTape.appendChild(d);
+  });
+}
+
+/* ================= LOAD ================= */
+function loadInput(){
+  const v=manualInput.value.trim();
+  if(!/^[1]+#[1]+$/.test(v)){
+    alert("Enter unary addition like 11#1");
+    return;
+  }
+
+  inputTapeData=["_",...v.split(""),"_"];
+  outputTapeData=[...inputTapeData];
+
+  head=1;
+  currentState="q0";
+  states=[]; transitions=[]; stateCounter=0;
+
+  renderTape();
+  draw();
+  updateTransitionTable();
+}
+
+/* ================= TM STEP ================= */
+function tmStep(){
+  if(head>=outputTapeData.length) outputTapeData.push("_");
+
+  let read=outputTapeData[head];
+  let write=read, move="S", next="qf";
+
+  /* -------- UNARY ADDITION LOGIC -------- */
+  if(currentState==="q0"){
+    if(read==="1"){ move="R"; next="q0"; }
+    else if(read==="#"){ write="_"; move="R"; next="q1"; }
+  }
+  else if(currentState==="q1"){
+    if(read==="1"){ move="R"; next="q1"; }
+    else if(read==="_"){ next="qf"; }
+  }
+
+  outputTapeData[head]=write;
+  if(move==="R") head++;
+  if(move==="L") head--;
+
+  if(!states.find(s=>s.name===currentState))
+    states.push({name:currentState,x:150+250*stateCounter++,y:260,final:false});
+  if(!states.find(s=>s.name===next))
+    states.push({name:next,x:150+250*stateCounter++,y:260,final:(next==="qf")});
+
+  transitions.push({from:currentState,to:next,read,write,move});
+  updateTransitionTable();
+
+  currentState=next;
+  renderTape();
+  draw();
+
+  return currentState!=="qf";
+}
+
+/* ========== CLEAN OUTPUT (IMPORTANT FIX) ========== */
+function cleanupOutputTape(){
+  const core = outputTapeData.slice(1,-1).filter(x=>x!=="_");
+  outputTapeData = ["_", ...core, "_"];
+  head = outputTapeData.length-2;
+}
+
+/* ================= RUN ================= */
+function runMachine(){
+  if(timer) clearInterval(timer);
+  timer=setInterval(()=>{
+    if(!tmStep()){
+      clearInterval(timer);
+      cleanupOutputTape();   // 🔥 removes middle _
+      renderTape();
+      document.getElementById("completionPopup").style.display="flex";
+    }
+  },600);
+}
+
+/* ================= TABLE ================= */
+function updateTransitionTable(){
+  transitionBody.innerHTML="";
+  transitions.forEach(t=>{
+    const r=document.createElement("tr");
+    r.innerHTML=`<td>${t.from}</td><td>${t.to}</td><td>${t.read}</td><td>${t.write}</td><td>${t.move}</td>`;
+    transitionBody.appendChild(r);
+  });
+}
+</script>
+</body>
+</html>

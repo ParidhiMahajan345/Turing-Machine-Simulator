@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Turing Quest — Binary Palindrome TM</title>
+<style>
+:root{
+  --bg1:#02060a;
+  --bg2:#07121a;
+  --accent:#00d4ff;
+  --accent2:#8b5cf6;
+}
+html,body{height:100%;margin:0;background:linear-gradient(135deg,var(--bg1),var(--bg2));color:white;font-family:Inter,Arial;}
+header{padding:18px 22px;border-bottom:1px solid rgba(255,255,255,.05);}
+.logo{font-weight:900;font-size:20px;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;color:transparent;}
+.container{max-width:1300px;margin:22px auto;padding:0 20px;}
+.tape-box{background:rgba(0,0,0,.35);padding:16px;border-radius:14px;margin-bottom:16px;}
+.tape-row{display:flex;gap:8px;flex-wrap:wrap;}
+.cell{width:42px;height:42px;border-radius:8px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:18px;}
+.cell.active{background:#00d4ff;color:#021019;font-weight:bold;}
+canvas{background:rgba(0,0,0,.35);border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.6);}
+table{border-collapse:collapse;width:100%;}
+th,td{border:1px solid #00d4ff;padding:4px;text-align:center;font-size:14px;}
+th{background:rgba(0,212,255,.2);}
+#completionPopup{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);padding:30px 50px;background:rgba(255,255,255,.1);border:1px solid rgba(0,212,255,.3);border-radius:16px;font-size:22px;font-weight:bold;color:#00d4ff;display:none;}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Turing Quest — Binary Palindrome TM</div>
+</header>
+<div class="container">
+<div class="tape-box">
+  <b>Input Tape</b>
+  <div id="inputTape" class="tape-row"></div>
+  <b style="margin-top:10px;display:block">Output Tape</b>
+  <div id="outputTape" class="tape-row"></div>
+  <div style="margin-top:10px">
+    Input String (binary): 
+    <input id="manualInput" placeholder="10101">
+    <button onclick="loadInput()">Load Input</button>
+    <button onclick="runMachine()">Run Machine</button>
+  </div>
+</div>
+
+<div class="tape-box">
+  <b>Transition Table</b>
+  <table>
+    <thead>
+      <tr>
+        <th>From</th><th>To</th><th>Read</th><th>Write</th><th>Move</th>
+      </tr>
+    </thead>
+    <tbody id="transitionBody"></tbody>
+  </table>
+</div>
+
+<canvas id="canvas" width="1100" height="520"></canvas>
+<div id="completionPopup"></div>
+</div>
+
+<script>
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
+const R=28;
+
+let states=[], transitions=[], stateCounter=0;
+let inputTapeData=[], outputTapeData=[];
+let currentState="q0", timer=null;
+let left=0, right=0, leftSymbol=null, phase="markLeft";
+
+/* ================= DRAW ================= */
+function drawArrow(x,y,a){
+  const s=12;
+  ctx.fillStyle="#00d4ff";
+  ctx.beginPath();
+  ctx.moveTo(x,y);
+  ctx.lineTo(x-s*Math.cos(a-Math.PI/6),y-s*Math.sin(a-Math.PI/6));
+  ctx.lineTo(x-s*Math.cos(a+Math.PI/6),y-s*Math.sin(a+Math.PI/6));
+  ctx.closePath();
+  ctx.fill();
+}
+function drawLabel(t,x,y){
+  ctx.font="12px monospace";
+  ctx.fillStyle="#00d4ff";
+  ctx.fillText(t,x,y);
+}
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  states.forEach(s=>{
+    ctx.fillStyle=s.name===currentState?"#00ff80":"#00d4ff";
+    ctx.beginPath();
+    ctx.arc(s.x,s.y,R,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle="#021019";
+    ctx.fillText(s.name,s.x-8,s.y+4);
+  });
+  transitions.forEach(tr=>{
+    const f=states.find(s=>s.name===tr.from);
+    const t=states.find(s=>s.name===tr.to);
+    if(!f||!t) return;
+    const a=Math.atan2(t.y-f.y,t.x-f.x);
+    const sx=f.x+R*Math.cos(a),sy=f.y+R*Math.sin(a);
+    const ex=t.x-R*Math.cos(a),ey=t.y-R*Math.sin(a);
+    ctx.strokeStyle="#00d4ff";ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
+    drawArrow(ex,ey,a);
+    drawLabel(`${tr.read}/${tr.write},${tr.move}`,(sx+ex)/2,(sy+ey)/2-6);
+  });
+}
+
+/* ================= TAPE ================= */
+function renderTape(){
+  inputTape.innerHTML=""; outputTape.innerHTML="";
+  inputTapeData.forEach(s=>{
+    const d=document.createElement("div");
+    d.className="cell";
+    d.textContent=s;
+    inputTape.appendChild(d);
+  });
+  outputTapeData.forEach((s,i)=>{
+    const d=document.createElement("div");
+    d.className="cell"+((i===left || i===right) && currentState!=="qf"?" active":"");
+    d.textContent=s;
+    outputTape.appendChild(d);
+  });
+}
+
+/* ================= LOAD INPUT ================= */
+function loadInput(){
+  const val=document.getElementById("manualInput").value.trim();
+  if(!/^[01]+$/.test(val)){alert("Enter valid binary string"); return;}
+
+  inputTapeData = ["_", ...val.split(""), "_"];
+  outputTapeData = [...inputTapeData];
+
+  states=[]; transitions=[]; stateCounter=0;
+  currentState="q0"; left=1; right=outputTapeData.length-2; phase="markLeft"; leftSymbol=null;
+  states.push({name:"q0",x:120,y:260});
+  document.getElementById("completionPopup").style.display="none";
+
+  renderTape(); draw(); updateTransitionTable();
+}
+
+/* ================= TM STEP ================= */
+function tmStep(){
+  if(left > right){ 
+  // all symbols checked, palindrome
+  const qf="qf";
+  states.push({name:qf,x:120+stateCounter*150,y:260});
+  transitions.push({from:currentState,to:qf,read:"_",write:"_",move:"-"});
+  currentState="qf";
+  draw(); renderTape();
+  document.getElementById("completionPopup").innerText="Palindrome ✅";
+  document.getElementById("completionPopup").style.display="block";
+  updateTransitionTable();
+  return false;
+} else if(left === right){
+  // middle symbol in odd-length string
+  let midSymbol = outputTapeData[left];
+  outputTapeData[left] = "X";
+  let next = "q"+(++stateCounter);
+  transitions.push({from:currentState,to:next,read:midSymbol,write:"X",move:"-"});
+  states.push({name:next,x:120+stateCounter*150,y:260});
+  currentState = next;
+  draw(); renderTape(); updateTransitionTable();
+  
+  // then halt
+  const qf="qf";
+  states.push({name:qf,x:120+stateCounter*150+150,y:260});
+  transitions.push({from:currentState,to:qf,read:"_",write:"_",move:"-"});
+  currentState="qf";
+  draw(); renderTape();
+  document.getElementById("completionPopup").innerText="Palindrome ✅";
+  document.getElementById("completionPopup").style.display="block";
+  updateTransitionTable();
+  return false;
+} 
+
+  let next="q"+(++stateCounter);
+
+  if(phase==="markLeft"){
+    // Move right until non-X (left symbol)
+    while(outputTapeData[left]==="X" && left<right) left++;
+    leftSymbol = outputTapeData[left];
+    outputTapeData[left]="X";
+    transitions.push({from:currentState,to:next,read:leftSymbol,write:"X",move:"R"});
+    states.push({name:next,x:120+stateCounter*150,y:260});
+    currentState=next;
+    phase="markRight";
+  } else if(phase==="markRight"){
+    // Move left until non-X (right symbol)
+    while(outputTapeData[right]==="X" && right>left) right--;
+    let rightSymbol = outputTapeData[right];
+
+    if(leftSymbol !== rightSymbol){
+      const qf="qf";
+      transitions.push({from:currentState,to:qf,read:rightSymbol,write:rightSymbol,move:"-"});
+      states.push({name:qf,x:120+stateCounter*150,y:260});
+      currentState="qf";
+      draw(); renderTape();
+      document.getElementById("completionPopup").innerText="Not a Palindrome ❌";
+      document.getElementById("completionPopup").style.display="block";
+      updateTransitionTable();
+      return false;
+    }
+
+    outputTapeData[right]="X";
+    transitions.push({from:currentState,to:next,read:rightSymbol,write:"X",move:"L"});
+    states.push({name:next,x:120+stateCounter*150,y:260});
+    currentState=next;
+    left++; right--;
+    phase="markLeft";
+  }
+
+  renderTape(); draw(); updateTransitionTable();
+  return true;
+}
+
+/* ================= RUN ================= */
+function runMachine(){
+  if(timer) clearInterval(timer);
+  timer=setInterval(()=>{if(!tmStep()){clearInterval(timer);}},500);
+}
+
+/* ================= UPDATE TABLE ================= */
+function updateTransitionTable(){
+  const b=document.getElementById("transitionBody");
+  b.innerHTML="";
+  transitions.forEach(t=>{
+    b.innerHTML+=`<tr><td>${t.from}</td><td>${t.to}</td><td>${t.read}</td><td>${t.write}</td><td>${t.move}</td></tr>`;
+  });
+}
+</script>
+</body>
+</html>

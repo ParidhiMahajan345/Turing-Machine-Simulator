@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TuringQuest — Animated Puzzle Game</title>
+<style>
+:root{
+  --bg1: #02060a;
+  --bg2: #07121a;
+  --accent: #00d4ff;
+  --accent-2: #8b5cf6;
+  --mono: ui-monospace, "Roboto Mono", monospace;
+  font-family: Inter, system-ui, Arial, sans-serif;
+}
+html,body{height:100%; margin:0; background: linear-gradient(135deg,var(--bg1),var(--bg2)); color:white;}
+header{padding:18px 22px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,0.03); background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);}
+.logo{font-weight:900; font-size:18px; background:linear-gradient(90deg,var(--accent),var(--accent-2)); -webkit-background-clip:text; color:transparent;}
+.container{max-width:1100px;margin:22px auto;padding:0 20px;}
+h1{margin:6px 0 12px; font-size:28px; color:var(--accent);}
+
+.controls{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:12px;}
+.controls button{background:linear-gradient(90deg,var(--accent),var(--accent-2)); color:#021019; border:none; padding:10px 14px; border-radius:10px; font-weight:700; cursor:pointer;}
+.controls .muted{background:transparent; color:rgba(255,255,255,0.9); border:1px solid rgba(255,255,255,0.04);}
+
+#gameArea{display:block; margin-top:10px;}
+#canvasArea{border-radius:12px; display:block; margin:0 auto; background:linear-gradient(180deg, rgba(0,0,0,0.2), rgba(0,0,0,0.05)); box-shadow:0 12px 30px rgba(0,0,0,0.5);}
+
+.flex-row{display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap;}
+.col{flex:1 1 360px; min-width:280px;}
+
+/* Tape containers */
+.tapeBox{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border:1px solid rgba(0,212,255,0.07); padding:14px; border-radius:12px;}
+.tapeRow{display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:8px;}
+.tapeCell{width:44px;height:44px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:18px;background:transparent;transition:transform .15s, background .15s;}
+.headCell{background:var(--accent); color:#021019; transform:scale(1.03); box-shadow:0 6px 18px rgba(0,212,255,0.12);}
+
+/* Popup */
+#transitionPopup{display:none; position:fixed; background:linear-gradient(180deg, rgba(2,6,10,0.95), rgba(2,6,10,0.9)); color:var(--accent); border:1px solid rgba(0,212,255,0.18); padding:12px; z-index:9999; border-radius:8px; min-width:220px;}
+#transitionPopup label{display:block; font-size:12px; color:rgba(255,255,255,0.9); margin-top:6px;}
+#transitionPopup input,#transitionPopup select{width:100%; padding:6px; margin-top:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.06); background:transparent; color:white;}
+
+/* small instructions */
+.instructions{color:rgba(255,255,255,0.7); font-size:14px; margin-top:8px;}
+.footerNote{margin-top:18px; font-size:13px; color:rgba(255,255,255,0.6);}
+
+/* responsive */
+@media (max-width:900px){
+  #canvasArea{width:100% !important;}
+  .flex-row{flex-direction:column;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Turing Quest — Puzzle</div>
+  <div>
+    <button onclick="window.location.href='index.html'" class="muted">Back Home</button>
+  </div>
+</header>
+
+<div class="container">
+  <h1>Let the Quest Begin!</h1>
+
+  <div class="controls" id="machineSelection">
+    <button onclick="startPuzzle('binary')">Binary Increment</button>
+    <button onclick="startPuzzle('unaryInc')">Unary Increment</button>
+    <button onclick="startPuzzle('unaryAdd')">Unary Addition</button>
+    <div class="instructions">Choose machine type — then add states and transitions by clicking states (select → click target).</div>
+  </div>
+
+  <div id="gameArea" style="display:none;">
+    <div class="flex-row">
+      <div class="col">
+        <canvas id="canvasArea" width="820" height="360"></canvas>
+        <div class="footerNote">Click a blank area then "Add State" to add states. Click state A then B to create a transition.</div>
+      </div>
+
+      <div class="col">
+        <div class="tapeBox">
+          <div style="font-weight:800; color:var(--accent)">Input Tape</div>
+          <div id="tapeContainer" class="tapeRow"></div>
+
+          <div style="font-weight:800; color:var(--accent); margin-top:12px;">Output Tape</div>
+          <div id="outputTape" class="tapeRow"></div>
+
+          <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button onclick="addState()">Add State</button>
+            <button onclick="clearStates()" class="muted">Clear States</button>
+            <button onclick="autoLayout()" class="muted">Auto Layout</button>
+            <button onclick="runTM()">Run Machine</button>
+          </div>
+
+          <div style="margin-top:12px;">
+            <label style="display:block; font-size:13px; color:rgba(255,255,255,0.85)">Manual input (optional)</label>
+            <input id="manualInput" placeholder="e.g. 1101 or 111011" style="width:100%; padding:8px; margin-top:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.06); background:transparent; color:white;">
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <button onclick="loadManual()">Load Input</button>
+              <button onclick="randomizeInput()" class="muted">Randomize</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transition Popup -->
+  <div id="transitionPopup">
+    <div style="font-weight:800; color:var(--accent)"><span id="popupFrom"></span> → <span id="popupTo"></span></div>
+    <label>Read Symbol (use '_' for blank)</label>
+    <input type="text" id="readSymbol" maxlength="1" placeholder="_ or 0 or 1">
+    <label>Write Symbol (use '_' for blank)</label>
+    <input type="text" id="writeSymbol" maxlength="1" placeholder="_ or 0 or 1">
+    <label>Move</label>
+    <select id="moveDir"><option value="R">Right</option><option value="L">Left</option></select>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <button onclick="saveTransition()">Save</button>
+      <button onclick="cancelTransition()" class="muted">Cancel</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ------------------------
+   State & TM data
+   ------------------------ */
+let inputTape = [];
+let tape = [];
+let states = [];        // {name, x, y}
+let transitions = [];   // {from,to,read,write,move}
+let currentMachine = '';
+let selectedState = null;
+let canvas, ctx;
+let headPos = 0;
+let animDelay = 250; // ms
+let isRunning = false;
+
+/* ------------------------
+   Start / Init
+   ------------------------ */
+function startPuzzle(machineType){
+  currentMachine = machineType;
+  document.getElementById('machineSelection').style.display = 'none';
+  document.getElementById('gameArea').style.display = 'block';
+
+  // Generate random input depending on machine
+  if(machineType === 'binary'){
+    inputTape = Array.from({length:5}, ()=> Math.random()<0.5 ? '0':'1');
+  } else if(machineType === 'unaryInc'){
+    inputTape = Array.from({length: Math.floor(Math.random()*5 + 1) }, ()=> '1');
+  } else if(machineType === 'unaryAdd'){
+    const a = Math.floor(Math.random()*3 + 1);
+    const b = Math.floor(Math.random()*3 + 1);
+    inputTape = [...Array(a).fill('1'), '0', ...Array(b).fill('1')];
+  }
+
+  tape = inputTape.slice();
+  headPos = 0;
+  states = [];
+  transitions = [];
+  selectedState = null;
+  canvas = document.getElementById('canvasArea');
+  ctx = canvas.getContext('2d');
+  ctx.font = "14px Inter, Arial";
+  drawCanvas();
+  drawTape();
+  drawOutputTape();
+
+  canvas.onclick = canvasClick;
+  canvas.oncontextmenu = (e)=> { e.preventDefault(); }; // disable right-click menu
+}
+
+/* ------------------------
+   UI Utilities
+   ------------------------ */
+function addState(){
+  const stateName = 'q' + states.length;
+  const x = 100 + (states.length % 6) * 110;
+  const y = 90 + Math.floor(states.length / 6) * 100;
+  states.push({name: stateName, x, y});
+  drawCanvas();
+}
+
+function clearStates(){
+  if(isRunning) return;
+  states = [];
+  transitions = [];
+  selectedState = null;
+  drawCanvas();
+}
+
+function autoLayout(){
+  states.forEach((s,i)=>{
+    s.x = 80 + (i%5)*140;
+    s.y = 80 + Math.floor(i/5)*120;
+  });
+  drawCanvas();
+}
+
+/* ------------------------
+   Canvas drawing
+   ------------------------ */
+function drawCanvas(){
+  if(!ctx) return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // transitions (draw first so states are on top)
+  transitions.forEach(t=>{
+    const from = states.find(s=>s.name===t.from);
+    const to = states.find(s=>s.name===t.to);
+    if(!from || !to) return;
+    if(from === to){
+      // loop
+      const radius = 26;
+      const x = from.x;
+      const y = from.y;
+      ctx.beginPath();
+      ctx.strokeStyle = '#00d4ff';
+      ctx.lineWidth = 2.2;
+      ctx.arc(x, y - 36, radius, 0.6*Math.PI, 2.4*Math.PI);
+      ctx.stroke();
+
+      // arrow head
+      const arrowX = x + radius * Math.cos(-Math.PI/2);
+      const arrowY = (y - 36) + radius * Math.sin(-Math.PI/2);
+      drawHead(arrowX, arrowY, -Math.PI/2);
+
+      // label
+      ctx.fillStyle = 'white';
+      ctx.fillText(`${t.read}/${t.write},${t.move}`, x - 30, y - 70);
+    } else {
+      drawArrow(from.x, from.y, to.x, to.y);
+      ctx.fillStyle = 'white';
+      ctx.fillText(`${t.read}/${t.write},${t.move}`, (from.x+to.x)/2 - 10, (from.y+to.y)/2 - 12);
+    }
+  });
+
+  // states
+  states.forEach(s=>{
+    ctx.beginPath();
+    ctx.fillStyle = '#00d4ff';
+    ctx.strokeStyle = '#00d4ff';
+    ctx.lineWidth = 2;
+    ctx.arc(s.x, s.y, 28, 0, 2*Math.PI);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#021019';
+    ctx.font = "bold 14px Inter, Arial";
+    ctx.fillText(s.name, s.x - ctx.measureText(s.name).width/2, s.y + 5);
+  });
+
+  // selected state highlight
+  if(selectedState){
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 3;
+    ctx.arc(selectedState.x, selectedState.y, 34, 0, 2*Math.PI);
+    ctx.stroke();
+  }
+}
+
+function drawArrow(x1,y1,x2,y2){
+  const headlen = 10;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const angle = Math.atan2(dy, dx);
+  const startOffset = 28 * Math.abs(1); // radius
+  const endOffset = 28;
+
+  const sx = x1 + Math.cos(angle) * startOffset;
+  const sy = y1 + Math.sin(angle) * startOffset;
+  const ex = x2 - Math.cos(angle) * endOffset;
+  const ey = y2 - Math.sin(angle) * endOffset;
+
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(ex, ey);
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  drawHead(ex, ey, angle);
+}
+
+function drawHead(x,y,angle){
+  ctx.beginPath();
+  ctx.fillStyle = '#00d4ff';
+  ctx.moveTo(x, y);
+  ctx.lineTo(x - 10*Math.cos(angle - Math.PI/6), y - 10*Math.sin(angle - Math.PI/6));
+  ctx.lineTo(x - 10*Math.cos(angle + Math.PI/6), y - 10*Math.sin(angle + Math.PI/6));
+  ctx.closePath();
+  ctx.fill();
+}
+
+/* ------------------------
+   Mouse / Interaction
+   ------------------------ */
+function getStateAt(x,y){
+  return states.find(s=>{
+    const dx = x - s.x;
+    const dy = y - s.y;
+    return Math.sqrt(dx*dx + dy*dy) <= 28;
+  });
+}
+
+function canvasClick(e){
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  // if click on empty area and ctrl/shift is pressed, add state there
+  const clicked = getStateAt(x,y);
+  if(clicked){
+    if(!selectedState){
+      selectedState = clicked;
+    } else {
+      // create transition between selectedState and clicked
+      showTransitionPopup(selectedState, clicked, e.clientX, e.clientY);
+      selectedState = null;
+    }
+  } else {
+    // add state at clicked location
+    const newName = 'q' + states.length;
+    states.push({name:newName, x: x, y: y});
+    drawCanvas();
+  }
+}
+
+/* ------------------------
+   Popup: create/save transitions
+   ------------------------ */
+function showTransitionPopup(fromState, toState, clientX=window.innerWidth/2, clientY=window.innerHeight/2){
+  const popup = document.getElementById('transitionPopup');
+  popup.style.display = 'block';
+  // position: prefer near click but keep inside viewport
+  const pad = 12;
+  let left = clientX + 6;
+  let top = clientY + 6;
+  // ensure not outside
+  if(left + popup.offsetWidth > window.innerWidth - pad) left = window.innerWidth - popup.offsetWidth - pad;
+  if(top + popup.offsetHeight > window.innerHeight - pad) top = window.innerHeight - popup.offsetHeight - pad;
+  popup.style.left = left + 'px';
+  popup.style.top = top + 'px';
+
+  document.getElementById('popupFrom').textContent = fromState.name;
+  document.getElementById('popupTo').textContent = toState.name;
+  popup.dataset.from = fromState.name;
+  popup.dataset.to = toState.name;
+  document.getElementById('readSymbol').value = '';
+  document.getElementById('writeSymbol').value = '';
+  document.getElementById('moveDir').value = 'R';
+}
+
+function saveTransition(){
+  const popup = document.getElementById('transitionPopup');
+  const from = popup.dataset.from;
+  const to = popup.dataset.to;
+  let read = document.getElementById('readSymbol').value || '_';
+  let write = document.getElementById('writeSymbol').value || '_';
+  const move = document.getElementById('moveDir').value;
+
+  // normalize blank symbol
+  if(read === '') read = '_';
+  if(write === '') write = '_';
+
+  // allow only single char
+  read = read.charAt(0);
+  write = write.charAt(0);
+
+  // overwrite if a transition with same from/read exists? Allow multiple edges: keep them
+  transitions.push({from, to, read, write, move});
+  popup.style.display = 'none';
+  drawCanvas();
+}
+
+function cancelTransition(){
+  document.getElementById('transitionPopup').style.display = 'none';
+}
+
+/* ------------------------
+   Tape drawing & helpers
+   ------------------------ */
+function drawTape(){
+  const container = document.getElementById('tapeContainer');
+  container.innerHTML = '';
+  tape.forEach((sym, i)=>{
+    const div = document.createElement('div');
+    div.className = 'tapeCell';
+    if(i === headPos) div.classList.add('headCell');
+    div.textContent = sym === '_' ? '_' : sym;
+    container.appendChild(div);
+  });
+}
+
+function drawOutputTape(){
+  const container = document.getElementById('outputTape');
+  container.innerHTML = '';
+  tape.forEach(sym=>{
+    const div = document.createElement('div');
+    div.className = 'tapeCell';
+    div.textContent = sym === '_' ? '_' : sym;
+    container.appendChild(div);
+  });
+}
+
+/* ------------------------
+   Input management
+   ------------------------ */
+function loadManual(){
+  const val = document.getElementById('manualInput').value.trim();
+  if(!val) { alert('Enter a tape string'); return; }
+  // only accept 0/1/_
+  const arr = val.split('').map(ch => ch === '_' ? '_' : ch);
+  inputTape = arr;
+  tape = [...inputTape];
+  headPos = 0;
+  drawTape();
+  drawOutputTape();
+}
+
+function randomizeInput(){
+  if(currentMachine === 'binary'){
+    inputTape = Array.from({length:5}, ()=> Math.random()<0.5 ? '0':'1');
+  } else if(currentMachine === 'unaryInc'){
+    inputTape = Array.from({length: Math.floor(Math.random()*5 + 1) }, ()=> '1');
+  } else {
+    const a = Math.floor(Math.random()*3 + 1);
+    const b = Math.floor(Math.random()*3 + 1);
+    inputTape = [...Array(a).fill('1'), '0', ...Array(b).fill('1')];
+  }
+  tape = [...inputTape];
+  headPos = 0;
+  drawTape();
+  drawOutputTape();
+}
+
+/* ------------------------
+   Execution: runTM
+   ------------------------ */
+async function runTM(){
+  if(isRunning) return;
+  if(states.length === 0){
+    alert('Add at least one state before running!');
+    return;
+  }
+  isRunning = true;
+
+  // reset tape & head
+  tape = [...inputTape];
+  headPos = 0;
+  drawTape();
+
+  // ensure blanks at ends for movement
+  for(let i=0;i<10;i++) tape.push('_'); // give space on right
+  while(tape.length < 20) tape.unshift('_'); // pad left
+
+  let current = states[0].name; // start at first state
+  const maxSteps = 200;
+  let accepted = false;
+
+  for(let step=0; step<maxSteps; step++){
+    drawTape();
+    await sleep(animDelay);
+
+    // read symbol at head (normalize blanks)
+    const sym = tape[headPos] === undefined ? '_' : tape[headPos];
+
+    // find a matching transition (from current and read symbol)
+    let trans = transitions.find(t => t.from === current && t.read === sym);
+    if(!trans){
+      // try wildcard transitions (read = '_') or that read any symbol if coded - not implemented: break
+      break;
+    }
+
+    // apply transition
+    tape[headPos] = trans.write === '_' ? '_' : trans.write;
+    if(trans.move === 'R'){
+      headPos++;
+      if(headPos >= tape.length) tape.push('_');
+    } else {
+      headPos--;
+      if(headPos < 0){
+        tape.unshift('_');
+        headPos = 0;
+      }
+    }
+
+    current = trans.to;
+
+    drawTape();
+    await sleep(animDelay);
+  }
+
+  drawOutputTape();
+
+  // compute expected output based on machine (best-effort)
+  let expected = [];
+  if(currentMachine === 'unaryInc'){
+    expected = [...inputTape, '1'];
+  } else if(currentMachine === 'binary'){
+    try {
+      // sanitize: remove any blanks
+      const bin = inputTape.filter(c=>c === '0' || c === '1').join('');
+      const val = bin === '' ? 0 : parseInt(bin, 2);
+      expected = val.toString(2).split('');
+    } catch(e){
+      expected = [];
+    }
+  } else if(currentMachine === 'unaryAdd'){
+    const sep = inputTape.indexOf('0');
+    if(sep >= 0){
+      const ones = sep + (inputTape.length - sep - 1);
+      expected = Array(ones).fill('1');
+    } else expected = inputTape.slice();
+  }
+
+  // simplify the tape into a trimmed array (remove leading/trailing blanks)
+  const trimmed = tape.slice().filter((c,i)=>true); // keep as-is for now
+
+  // compare by joining relevant non-blank symbols (heuristic)
+  const outStr = tape.filter(c=>c !== '_').join('');
+  const expStr = expected.filter(c=>c !== '_').join('');
+
+  if(expStr !== '' && outStr === expStr){
+    alert('✅ Accepted! Output: ' + outStr);
+  } else {
+    alert('❌ Rejected (or mismatch). Output: ' + (outStr || tape.join('')));
+  }
+
+  isRunning = false;
+}
+
+function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+
+/* ------------------------
+   Helpers
+   ------------------------ */
+function getStateIndexByName(name){
+  return states.findIndex(s=>s.name === name);
+}
+
+function drawEverything(){
+  drawCanvas();
+  drawTape();
+  drawOutputTape();
+}
+
+/* ------------------------
+   Init small handlers for load
+   ------------------------ */
+(function onLoad(){
+  // nothing to do until user clicks a machine
+})();
+
+</script>
+</body>
+</html>

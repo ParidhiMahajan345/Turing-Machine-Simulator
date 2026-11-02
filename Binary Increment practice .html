@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Turing Quest — Binary Increment</title>
+
+<style>
+:root{
+  --bg1:#02060a; --bg2:#07121a;
+  --accent:#00d4ff; --accent2:#8b5cf6;
+  font-family:Inter, Arial, sans-serif;
+}
+html,body{
+  height:100%; margin:0;
+  background:linear-gradient(135deg,var(--bg1),var(--bg2));
+  color:white;
+}
+header{
+  padding:18px 22px;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.logo{
+  font-weight:900;
+  font-size:20px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;
+  color:transparent;
+}
+.container{
+  max-width:1300px;
+  margin:22px auto;
+  padding:0 20px;
+}
+canvas{
+  background:rgba(0,0,0,0.35);
+  border-radius:12px;
+  box-shadow:0 10px 28px rgba(0,0,0,.6);
+  cursor:pointer;
+}
+.footer{
+  margin-top:12px;
+  font-size:13px;
+  color:rgba(255,255,255,.6);
+}
+#transitionPopup{
+  display:none;
+  position:fixed;
+  background:#050a0f;
+  border:1px solid rgba(0,212,255,.3);
+  border-radius:12px;
+  padding:14px;
+  width:280px;
+  z-index:9999;
+}
+#transitionPopup input,#transitionPopup select{
+  width:100%;
+  margin-top:6px;
+  padding:6px;
+  background:#02060a;
+  color:white;
+  border:1px solid rgba(255,255,255,.1);
+}
+/* ===== TAPE UI ===== */
+.tape-box{
+  background:rgba(0,0,0,0.35);
+  padding:16px;
+  border-radius:14px;
+  margin-bottom:16px;
+}
+
+.tape-row{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.cell{
+  width:42px;
+  height:42px;
+  border-radius:8px;
+  background:rgba(255,255,255,0.07);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:monospace;
+  font-size:18px;
+}
+
+.cell.active{
+  background:#00d4ff;
+  color:#021019;
+  font-weight:bold;
+}
+
+.tape-box input{
+  padding:6px;
+  width:180px;
+}
+.tape-box button{
+  margin-left:6px;
+  padding:6px 10px;
+}
+
+</style>
+</head>
+
+<body>
+<header>
+  <div class="logo">Turing Quest — Binary Increment</div>
+</header>
+
+<div class="container">
+<div class="tape-box">
+  <div style="margin-bottom:6px;font-weight:bold">Transition Table (Auto-generated)</div>
+  <table id="transitionTable" style="width:100%; border-collapse: collapse;">
+    <thead>
+      <tr style="background:rgba(0,212,255,0.2)">
+        <th style="border:1px solid #00d4ff; padding:4px;">From</th>
+        <th style="border:1px solid #00d4ff; padding:4px;">To</th>
+        <th style="border:1px solid #00d4ff; padding:4px;">Read</th>
+        <th style="border:1px solid #00d4ff; padding:4px;">Write</th>
+        <th style="border:1px solid #00d4ff; padding:4px;">Move</th>
+      </tr>
+    </thead>
+    <tbody id="transitionBody"></tbody>
+  </table>
+</div>
+
+<!-- ===== TAPE UI (ADDED – FA SAFE) ===== -->
+<div class="tape-box">
+  <div style="margin-bottom:6px;font-weight:bold">Input Tape</div>
+  <div class="tape-row" id="inputTape"></div>
+
+  <div style="margin:10px 0 6px;font-weight:bold">Output Tape</div>
+  <div class="tape-row" id="outputTape"></div>
+
+  <div style="margin-top:10px">
+    Manual Input (Binary Number):
+    <input id="manualInput" placeholder="101">
+    <button onclick="loadInput()">Load Input</button>
+    <button onclick="runMachine()">Run Machine</button>
+  </div>
+</div>
+
+<canvas id="canvas" width="1100" height="520"></canvas>
+<div class="footer">
+  Click blank → Add state | Click state → Click another → Transition
+</div>
+</div>
+
+<div class="tape-box">
+<div id="transitionPopup">
+  <b><span id="fromState"></span> → <span id="toState"></span></b>
+
+  <label>Read</label><input id="readSym">
+  <label>Write</label><input id="writeSym">
+  <label>Move</label>
+  <select id="moveDir">
+    <option>R</option>
+    <option>L</option>
+  </select>
+
+  <label style="margin-top:8px">
+    <input type="checkbox" id="finalCheck"> Make destination Final
+  </label>
+
+  <div style="margin-top:10px">
+    <button onclick="saveTransition()">Save</button>
+    <button onclick="closePopup()">Cancel</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let states = [];
+let transitions = [];
+let selected = null;
+
+const R = 28;
+const STATE_GAP = 200;
+
+/* ---------- ARROW ---------- */
+function drawArrow(x,y,a){
+  ctx.fillStyle = "#00d4ff";
+  const s = 10;
+  ctx.beginPath();
+  ctx.moveTo(x,y);
+  ctx.lineTo(x-s*Math.cos(a-Math.PI/6),y-s*Math.sin(a-Math.PI/6));
+  ctx.lineTo(x-s*Math.cos(a+Math.PI/6),y-s*Math.sin(a+Math.PI/6));
+  ctx.closePath();
+  ctx.fill();
+}
+
+/* ---------- LABEL ---------- */
+function drawLabel(text,x,y){
+  ctx.save();
+  ctx.font="12px monospace";
+  ctx.lineWidth=3;
+  ctx.strokeStyle="rgba(0,0,0,0.7)";
+  ctx.strokeText(text,x,y);
+  ctx.fillStyle="#00d4ff";
+  ctx.fillText(text,x,y);
+  ctx.restore();
+}
+
+/* ---------- DRAW ---------- */
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.font="12px monospace";
+  ctx.strokeStyle="#00d4ff";
+  ctx.fillStyle="#00d4ff";
+
+  const map={};
+  transitions.forEach(t=>{
+    (map[t.from+"->"+t.to]=map[t.from+"->"+t.to]||[]).push(t);
+  });
+
+  for(const key in map){
+    const list=map[key];
+    const f=states.find(s=>s.name===list[0].from);
+    const t=states.find(s=>s.name===list[0].to);
+    if(!f||!t) continue;
+
+    if(f===t){
+      ctx.beginPath();
+      ctx.arc(f.x,f.y-60,34,0.3*Math.PI,2.7*Math.PI);
+      ctx.stroke();
+      drawArrow(f.x+34,f.y-60,Math.PI/2);
+
+      list.forEach((e,i)=>{
+        drawLabel(`${e.read}/${e.write},${e.move}`,f.x-30,f.y-100-i*14);
+      });
+      continue;
+    }
+
+    const dx=t.x-f.x, dy=t.y-f.y;
+    const ang=Math.atan2(dy,dx);
+    const dist=Math.hypot(dx,dy);
+
+    const sx=f.x+R*Math.cos(ang);
+    const sy=f.y+R*Math.sin(ang);
+    const ex=t.x-R*Math.cos(ang);
+    const ey=t.y-R*Math.sin(ang);
+
+    const fi=states.indexOf(f);
+    const ti=states.indexOf(t);
+
+    let curve=0;
+    if(Math.abs(fi-ti)>1) curve=(ti>fi?1:-1)*Math.min(260,dist*0.9);
+    else if(map[t.name+"->"+f.name]) curve=120;
+
+    const mx=(sx+ex)/2 - curve*Math.sin(ang);
+    const my=(sy+ey)/2 + curve*Math.cos(ang);
+
+    ctx.beginPath();
+    ctx.moveTo(sx,sy);
+    ctx.quadraticCurveTo(mx,my,ex,ey);
+    ctx.stroke();
+
+    drawArrow(ex,ey,Math.atan2(ey-my,ex-mx));
+
+    const nx=Math.cos(ang+Math.PI/2);
+    const ny=Math.sin(ang+Math.PI/2);
+
+    list.forEach((e,i)=>{
+      drawLabel(`${e.read}/${e.write},${e.move}`,mx+nx*12,my+ny*(12+i*14));
+    });
+  }
+
+  /* ---- STATES ---- */
+  states.forEach(s=>{
+    ctx.fillStyle="#00d4ff";
+    ctx.beginPath();
+    ctx.arc(s.x,s.y,R,0,Math.PI*2);
+    ctx.fill();
+
+    if(s.final){
+      ctx.strokeStyle="#021019";
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,R-6,0,Math.PI*2);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle="#021019";
+    ctx.fillText(s.name,s.x-8,s.y+4);
+  });
+}
+
+/* ---------- INTERACTION ---------- */
+canvas.addEventListener("click",e=>{
+  const r=canvas.getBoundingClientRect();
+  const x=e.clientX-r.left;
+  const y=e.clientY-r.top;
+
+  const hit=states.find(s=>Math.hypot(s.x-x,s.y-y)<=R);
+
+  if(hit){
+    if(!selected) selected=hit;
+    else openPopup(selected,hit,e.clientX,e.clientY),selected=null;
+  }else{
+    states.push({
+      name:'q'+states.length,
+      x:140+states.length*STATE_GAP,
+      y:260,
+      final:false
+    });
+  }
+  draw();
+});
+
+/* ---------- POPUP ---------- */
+function openPopup(f,t,x,y){
+  fromState.textContent=f.name;
+  toState.textContent=t.name;
+  transitionPopup.dataset.from=f.name;
+  transitionPopup.dataset.to=t.name;
+  finalCheck.checked=t.final;
+  transitionPopup.style.left=x+"px";
+  transitionPopup.style.top=y+"px";
+  transitionPopup.style.display="block";
+}
+function closePopup(){
+  transitionPopup.style.display="none";
+}
+function saveTransition(){
+  const to=states.find(s=>s.name===transitionPopup.dataset.to);
+  to.final=finalCheck.checked;
+
+  transitions.push({
+    from:transitionPopup.dataset.from,
+    to:transitionPopup.dataset.to,
+    read:readSym.value||'_',
+    write:writeSym.value||'_',
+    move:moveDir.value
+  });
+  closePopup();
+  draw();
+  updateTransitionTable();
+}
+
+
+draw();
+/* ================== TM EXECUTION (BINARY INCREMENT) ================== */
+
+let inputTapeData = [];
+let outputTapeData = [];
+let head = 0;
+let currentState = "q0";
+let timer = null;
+
+
+function renderTape(){
+  inputTape.innerHTML = "";
+  outputTape.innerHTML = "";
+
+  inputTapeData.forEach((sym, i) => {
+    const c = document.createElement("div");
+    c.className = "cell";
+    c.textContent = sym;
+    inputTape.appendChild(c);
+  });
+
+  outputTapeData.forEach((sym, i) => {
+    const c = document.createElement("div");
+    c.className = "cell" + (i === head ? " active" : "");
+    c.textContent = sym;
+    outputTape.appendChild(c);
+  });
+}
+function loadInput(){
+  const val = manualInput.value.trim();
+
+  if(!/^[01]+$/.test(val)){
+    alert("Enter a valid binary number, e.g. 101");
+    return;
+  }
+
+ inputTapeData = ["_", ...val.split(""), "_"];
+outputTapeData = [...inputTapeData]; // COPY input → output
+head = 1;
+currentState = "q0";
+renderTape();
+
+}
+
+function tmStep(){ 
+
+  // 🔹 Ensure infinite tape
+  if(head < 0){
+    outputTapeData.unshift("_");
+    head = 0;
+  }
+  if(head >= outputTapeData.length){
+    outputTapeData.push("_");
+  }
+
+  const read = outputTapeData[head];
+
+  // q0 → move right to blank
+  if(currentState === "q0"){
+    if(read === "0" || read === "1"){
+      head++;
+    } 
+    else if(read === "_"){
+      head--;
+      currentState = "q1";
+    }
+  }
+
+  // q1 → binary increment
+  else if(currentState === "q1"){
+    if(read === "0"){
+      outputTapeData[head] = "1";
+      currentState = "qf";
+    }
+    else if(read === "1"){
+      outputTapeData[head] = "0";
+      head--;
+    }
+    else if(read === "_"){
+      outputTapeData[head] = "1";
+      currentState = "qf";
+    }
+  }
+
+  renderTape();
+  return currentState !== "qf";
+}
+
+
+
+function runMachine(){
+  if(timer) clearInterval(timer);
+
+  // 🔴 IMPORTANT: show initial state FIRST
+  renderTape();
+
+  setTimeout(() => {
+    timer = setInterval(() => {
+      if(!tmStep()){
+        clearInterval(timer);
+        timer = null;
+      }
+    }, 600);
+  }, 600); // delay first move
+}
+function updateTransitionTable() {
+  const tbody = document.getElementById("transitionBody");
+  if(!tbody) return; 
+
+  tbody.innerHTML = "";
+
+  transitions.forEach(t => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="border:1px solid #00d4ff; padding:4px;">${t.from}</td>
+      <td style="border:1px solid #00d4ff; padding:4px;">${t.to}</td>
+      <td style="border:1px solid #00d4ff; padding:4px;">${t.read}</td>
+      <td style="border:1px solid #00d4ff; padding:4px;">${t.write}</td>
+      <td style="border:1px solid #00d4ff; padding:4px;">${t.move}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+</script>
+</body>
+</html>

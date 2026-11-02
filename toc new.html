@@ -1,0 +1,635 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Turing Machine Studio — Advanced (Standalone)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+:root{
+  --bg: #f4f7ff; --card:#ffffff; --primary:#6c63ff; --accent:#00c2a8; --muted:#6b7280; --bad:#ef4444; --good:#16a34a;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;
+  background:linear-gradient(180deg,#eef2ff 0%, var(--bg) 70%);
+  color:#041329; -webkit-font-smoothing:antialiased;
+}
+/* header */
+.header{
+  display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:linear-gradient(90deg,var(--primary),#8a7bff);color:white;
+  box-shadow:0 8px 26px rgba(108,99,255,0.12);
+}
+.header .brand{display:flex;gap:12px;align-items:center}
+.logo{
+  width:48px;height:48px;border-radius:10px;background:linear-gradient(180deg,#fff,#f1efff);
+  display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--primary);box-shadow:0 6px 18px rgba(0,0,0,0.06)
+}
+.header h1{margin:0;font-size:18px}
+.header p{margin:0;font-size:12px;opacity:0.95}
+/* layout */
+.app{max-width:1200px;margin:18px auto;padding:12px;display:grid;grid-template-columns:320px 1fr 360px;gap:14px}
+.card{background:var(--card);border-radius:12px;padding:12px;box-shadow:0 8px 28px rgba(12,16,52,0.04)}
+.left, .right{display:flex;flex-direction:column;gap:10px}
+.center{display:flex;flex-direction:column;gap:12px;padding:12px}
+/* controls */
+label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+.input, select{width:100%;padding:10px;border-radius:10px;border:1px solid #e9eefb;font-size:14px}
+.row{display:flex;gap:8px;align-items:center}
+.btn{padding:10px 12px;border-radius:10px;border:none;cursor:pointer;font-weight:700}
+.btn.primary{background:linear-gradient(90deg,var(--accent),#22c1c3);color:#022;box-shadow:0 8px 18px rgba(0,194,168,0.10)}
+.btn.ghost{background:#fff;border:1px solid #e6edf8}
+.btn.warn{background:#ffdede}
+.small{font-size:13px;color:var(--muted);margin-top:6px}
+
+/* tape */
+.tapeArea{border-radius:12px;padding:12px;background:linear-gradient(180deg,#fff,#fbfdff);box-shadow:0 8px 26px rgba(12,16,52,0.04)}
+.tapeView{display:flex;gap:10px;overflow:auto;padding:10px}
+.cell{min-width:60px;height:70px;border-radius:10px;background:#f8fafc;border:1px solid #e8f0ff;display:flex;align-items:center;justify-content:center;font-family:monospace;font-weight:800;font-size:22px;transition:transform .12s,box-shadow .12s}
+.cell.head{transform:translateY(-8px);box-shadow:0 18px 40px rgba(108,99,255,0.12);background:linear-gradient(180deg,#fff,#f2f6ff)}
+.cell.blank{opacity:.45}
+.cell.small{min-width:36px;height:42px;font-size:14px}
+
+/* state & info */
+.stateRow{display:flex;gap:8px;align-items:center}
+.badge{background:#eef2ff;padding:8px 10px;border-radius:10px;font-weight:700;color:var(--primary)}
+.log{background:#fbfbff;padding:10px;border-radius:10px;min-height:80px;overflow:auto;font-size:13px;color:var(--muted)}
+
+/* snapshots */
+.snapshots{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow:auto}
+.snap{display:flex;gap:8px;align-items:center;padding:8px;border-radius:10px;background:#fff;border:1px solid #eef2ff}
+.miniTape{display:flex;gap:4px;align-items:center}
+.miniCell{min-width:22px;height:26px;border-radius:6px;background:#f8fafc;border:1px solid #e6edf8;font-family:monospace;display:flex;align-items:center;justify-content:center}
+
+/* diagram */
+.diagramWrap{padding:8px;border-radius:10px;background:linear-gradient(180deg,#fff,#fbfdff)}
+svg{width:100%;height:260px}
+
+/* editor (builder) */
+.transEditor{display:grid;grid-template-columns:1fr 1fr 1fr 80px 80px;gap:8px;align-items:center;margin-top:8px}
+.transList{display:flex;flex-direction:column;gap:6px;max-height:160px;overflow:auto;margin-top:8px}
+
+/* utilities */
+.footer{max-width:1200px;margin:18px auto;padding:12px;color:var(--muted);font-size:13px}
+
+/* effects */
+.confetti{position:fixed;left:0;right:0;top:0;bottom:0;pointer-events:none;overflow:hidden}
+
+/* responsive */
+@media(max-width:1100px){.app{grid-template-columns:1fr; padding:10px}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="brand">
+    <div class="logo">TM</div>
+    <div>
+      <h1>Turing Machine Studio</h1>
+      <p>Advanced, interactive, app-like simulator — generate TM from input, build puzzles, animate steps</p>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <button id="themeBtn" class="btn ghost">Toggle Theme</button>
+    <button id="soundToggle" class="btn ghost">🔊 Sound</button>
+  </div>
+</div>
+
+<div class="app">
+  <!-- LEFT: Controls & Builder -->
+  <div class="card left">
+    <div>
+      <label>Input Tape (use 0 as separator) — Examples: <small>11 0 111</small></label>
+      <input id="inputTape" class="input" value="11 0 11">
+      <div class="small">Tape will be padded with blanks (B).</div>
+    </div>
+
+    <div>
+      <label>Choose Machine</label>
+      <select id="machineSelect" class="input">
+        <option value="unary_add">Unary Addition (1^n 0 1^m → 1^(n+m))</option>
+        <option value="unary_inc">Unary Increment (add one 1 at end)</option>
+        <option value="binary_inc">Binary Increment (simple starter)</option>
+      </select>
+    </div>
+
+    <div style="margin-top:8px" class="row">
+      <button id="genBtn" class="btn primary">Generate TM</button>
+      <button id="autoFixBtn" class="btn ghost">Auto-Fix (hint)</button>
+    </div>
+
+    <div style="margin-top:10px">
+      <label>Controls</label>
+      <div class="row">
+        <button id="stepBtn" class="btn">Step (Space)</button>
+        <button id="runBtn" class="btn primary">Run (R)</button>
+        <button id="pauseBtn" class="btn ghost">Pause</button>
+        <button id="resetBtn" class="btn warn">Reset</button>
+      </div>
+      <div class="speedRow" style="margin-top:8px;display:flex;align-items:center;gap:8px">
+        <label style="min-width:70px">Speed</label>
+        <input id="speedRange" type="range" min="100" max="1200" value="420" style="flex:1">
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label>Transition Editor (Fix / Add)</label>
+      <div class="transEditor">
+        <input id="tFrom" placeholder="from (q0)" class="input" />
+        <input id="tRead" placeholder="read (1/0/B)" class="input" />
+        <input id="tWrite" placeholder="write (1/0/B)" class="input" />
+        <select id="tDir" class="input"><option>R</option><option>L</option></select>
+        <input id="tTo" placeholder="to (q1/qf)" class="input" />
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="addTransBtn" class="btn primary">Add Transition</button>
+        <button id="clearTransBtn" class="btn ghost">Clear All</button>
+      </div>
+      <div class="transList" id="transList"></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label>Export / Import</label>
+      <div style="display:flex;gap:8px">
+        <button id="exportBtn" class="btn">Export JSON</button>
+        <label class="btn ghost" style="padding:10px 12px"><input id="fileImport" type="file" style="display:none">Import</label>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label>Achievements</label>
+      <div class="small">Earn stars by solving puzzles, finishing levels, or building your own TM.</div>
+      <div style="margin-top:8px" id="achievements">⭐️ 0 / 3</div>
+    </div>
+  </div>
+
+  <!-- CENTER: Tape & Canvas -->
+  <div class="card center">
+    <div class="tapeArea">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:800;color:var(--primary)">Tape Simulator</div>
+        <div style="font-size:13px;color:var(--muted)">Interactive — click a cell to move head</div>
+      </div>
+
+      <div id="tapeView" class="tapeView" style="margin-top:12px"></div>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+        <div class="stateRow">
+          <div class="badge" id="curState">—</div>
+          <div style="font-size:13px;color:var(--muted)">Head: <b id="curHead">-</b></div>
+        </div>
+        <div style="margin-left:10px" id="stepInfo" class="small"></div>
+        <div style="margin-left:auto;font-weight:700" id="statusBox">Ready</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:12px;align-items:flex-start">
+      <div style="flex:1">
+        <div style="font-weight:700;margin-bottom:6px">Snapshots (history)</div>
+        <div id="snapshots" class="snapshots"></div>
+      </div>
+      <div style="width:260px">
+        <div style="font-weight:700;margin-bottom:6px">Explanation</div>
+        <div id="explain" class="small">Generate a TM to see step explanations here.</div>
+        <div style="margin-top:10px">
+          <div style="font-weight:700;margin-bottom:6px">Result</div>
+          <div id="resultBox" style="padding:10px;border-radius:10px;background:#f7fffb;color:#064e3b;font-weight:700">Waiting...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Diagram & Details -->
+  <div class="card right">
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:700;color:var(--primary)">State Diagram</div>
+        <div style="font-size:13px;color:var(--muted)">Active edges highlighted</div>
+      </div>
+      <div class="diagramWrap" id="svgWrap" style="margin-top:8px"></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:700;color:var(--primary)">Transition Table</div>
+        <div style="font-size:13px;color:var(--muted)">Click to delete</div>
+      </div>
+      <div id="transTable" style="margin-top:8px"></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <div style="font-weight:700;color:var(--primary)">Hints & Help</div>
+      <div class="small" style="margin-top:8px" id="hints">Use Step to move one transition at a time. Use Builder to fix missing rules.</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">Tip: Press <b>Space</b> to Step, <b>R</b> to Run/Pause. This app is standalone and stores puzzles via export/import JSON.</div>
+
+<div id="confetti" class="confetti"></div>
+
+<script>
+/* ============================
+  Turing Machine Studio (single-file)
+  - Advanced features: multiple machines, editor, snapshots, SVG, sounds, achievements
+============================ */
+
+// WebAudio small utilities
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+const audioCtx = new AudioContext();
+let soundOn = true;
+function beep(freq=800, dur=0.06, vol=0.06){
+  if(!soundOn) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = 'sine'; o.frequency.value = freq; g.gain.value = vol;
+  o.connect(g); g.connect(audioCtx.destination); o.start();
+  setTimeout(()=>o.stop(), dur*1000);
+}
+function successTune(){
+  if(!soundOn) return;
+  beep(880,0.09,0.08); setTimeout(()=>beep(1100,0.08,0.06),90); setTimeout(()=>beep(1320,0.10,0.05),180);
+}
+document.getElementById('soundToggle').addEventListener('click', ()=>{
+  soundOn = !soundOn; document.getElementById('soundToggle').innerText = soundOn ? '🔊 Sound' : '🔈 Muted';
+});
+
+// Core model
+let tape = [], head = 0, curState = '-', startState = 'q0', acceptStates = [], transitions = [];
+let snapshots = [], stepCounter = 0;
+let running=false, runInterval=null, speed=420;
+const blank = 'B';
+
+// DOM refs
+const inputTape = document.getElementById('inputTape');
+const genBtn = document.getElementById('genBtn'), stepBtn=document.getElementById('stepBtn'), runBtn=document.getElementById('runBtn'), pauseBtn=document.getElementById('pauseBtn'), resetBtn=document.getElementById('resetBtn');
+const tapeView = document.getElementById('tapeView'), curStateBadge=document.getElementById('curState'), curHeadEl=document.getElementById('curHead'), statusBox=document.getElementById('statusBox');
+const snapshotsEl=document.getElementById('snapshots'), stepInfo=document.getElementById('stepInfo'), explain=document.getElementById('explain'), resultBox=document.getElementById('resultBox');
+const svgWrap=document.getElementById('svgWrap'), transTable=document.getElementById('transTable');
+const speedRange=document.getElementById('speedRange'), transList=document.getElementById('transList');
+const tFrom=document.getElementById('tFrom'), tRead=document.getElementById('tRead'), tWrite=document.getElementById('tWrite'), tDir=document.getElementById('tDir'), tTo=document.getElementById('tTo');
+const addTransBtn=document.getElementById('addTransBtn'), clearTransBtn=document.getElementById('clearTransBtn');
+const machineSelect=document.getElementById('machineSelect'), autoFixBtn=document.getElementById('autoFixBtn');
+const achievementsEl=document.getElementById('achievements'), hintsEl=document.getElementById('hints');
+const exportBtn=document.getElementById('exportBtn'), fileImport=document.getElementById('fileImport'), autoFix = document.getElementById('autoFixBtn');
+
+// speed control
+speedRange.addEventListener('input', ()=> speed = Number(speedRange.value));
+
+// keyboard shortcuts
+document.addEventListener('keydown', (e)=>{
+  if(e.code==='Space'){ e.preventDefault(); stepBtn.click(); }
+  if(e.key.toLowerCase()==='r'){ if(!running) runBtn.click(); else pauseBtn.click(); }
+});
+
+// helper log
+function pushLog(txt){
+  const log = `<div style="font-size:12px;color:#6b7280">${new Date().toLocaleTimeString()}</div>${txt}<br/>`;
+  const l = document.querySelector('.log');
+  if(l) l.innerHTML = log + l.innerHTML;
+}
+
+// achievements
+let achievements = 0;
+function awardAchievement(n){
+  achievements = Math.min(3, achievements + n);
+  achievementsEl.innerText = `⭐️ ${achievements} / 3`;
+}
+
+// theme toggle
+document.getElementById('themeBtn').addEventListener('click', ()=>{
+  document.body.classList.toggle('dark');
+  if(document.body.classList.contains('dark')){
+    document.documentElement.style.setProperty('--bg','#071023');
+    document.documentElement.style.setProperty('--card','#051123');
+    document.documentElement.style.setProperty('--primary','#8b5cf6');
+    document.documentElement.style.setProperty('--accent','#06b6d4');
+    document.documentElement.style.setProperty('--muted','#dbeafe');
+  } else {
+    document.documentElement.style.setProperty('--bg','#f4f7ff');
+    document.documentElement.style.setProperty('--card','#ffffff');
+    document.documentElement.style.setProperty('--primary','#6c63ff');
+    document.documentElement.style.setProperty('--accent','#00c2a8');
+    document.documentElement.style.setProperty('--muted','#6b7280');
+  }
+});
+
+// Utility: pad tape with blanks
+function buildTapeFromInput(raw){
+  const s = raw.trim().replace(/\s+/g,'');
+  if(!s || !/^[01]+$/.test(s)) return null;
+  return ['B', ...s.split(''), 'B','B','B'];
+}
+
+// generate machines: auto create transitions for selected machine
+function generateMachine(){
+  const raw = inputTape.value;
+  const built = buildTapeFromInput(raw);
+  if(!built){ alert('Enter tape with 0/1 only. Example: 11 0 111'); return; }
+  tape = built.slice();
+  head = 1;
+  stepCounter = 0; snapshots = [];
+  transitions = []; acceptStates = []; startState = 'q0';
+  const sel = machineSelect.value;
+
+  if(sel==='unary_add'){
+    startState='q0'; acceptStates=['qf'];
+    transitions = [
+      {from:'q0', read:'1', write:'B', dir:'R', to:'q1'},
+      {from:'q0', read:'0', write:'B', dir:'R', to:'qf'},
+      {from:'q0', read:'B', write:'B', dir:'R', to:'qf'},
+      {from:'q1', read:'1', write:'1', dir:'R', to:'q1'},
+      {from:'q1', read:'0', write:'0', dir:'R', to:'q2'},
+      {from:'q2', read:'1', write:'1', dir:'R', to:'q2'},
+      {from:'q2', read:'B', write:'1', dir:'L', to:'q3'},
+      {from:'q3', read:'1', write:'1', dir:'L', to:'q3'},
+      {from:'q3', read:'0', write:'0', dir:'L', to:'q3'},
+      {from:'q3', read:'B', write:'B', dir:'R', to:'q0'},
+    ];
+    explain.innerText = 'Unary Addition: For each 1 on left block, erase it and append 1 to right block. Machine repeats until no left 1 remains.';
+  } else if(sel==='unary_inc'){
+    startState='q0'; acceptStates=['qf'];
+    transitions = [
+      {from:'q0', read:'1', write:'1', dir:'R', to:'q0'},
+      {from:'q0', read:'0', write:'0', dir:'R', to:'q0'},
+      {from:'q0', read:'B', write:'1', dir:'R', to:'qf'},
+    ];
+    explain.innerText = 'Unary Increment: Move to the end, write one more 1, halt.';
+  } else if(sel==='binary_inc'){
+    startState='q0'; acceptStates=['qf'];
+    transitions = [
+      {from:'q0', read:'1', write:'1', dir:'R', to:'q0'},
+      {from:'q0', read:'0', write:'0', dir:'R', to:'q0'},
+      {from:'q0', read:'B', write:'B', dir:'L', to:'q1'},
+      {from:'q1', read:'0', write:'1', dir:'R', to:'qf'},
+      {from:'q1', read:'1', write:'0', dir:'L', to:'q1'},
+      {from:'q1', read:'B', write:'1', dir:'R', to:'qf'},
+    ];
+    explain.innerText = 'Binary Increment (starter): Adds 1 to binary number on tape (least significant at right). Use with binary inputs.';
+  }
+
+  curState = startState;
+  renderAll();
+  pushLog('Generated machine: ' + machineSelect.options[machineSelect.selectedIndex].text);
+  statusBox.innerText = 'Machine Generated';
+  successStars(0);
+  awardAchievement(0);
+}
+
+// find transition
+function findTransition(s, sym){
+  return transitions.find(t => t.from===s && t.read===sym);
+}
+
+// single step
+function tmStep(){
+  if(acceptStates.includes(curState)){
+    statusBox.innerText = 'Halted (accepted)';
+    pushLog('Machine already in accept state.');
+    return false;
+  }
+  const sym = tape[head] || 'B';
+  const trans = findTransition(curState, sym);
+  if(!trans){
+    statusBox.innerText = 'Halted (no rule)';
+    pushLog(`No rule for ${curState} reading ${sym} — halted.`);
+    resultBox.innerText = 'Halted (no rule) — final tape: ' + tape.join('');
+    return false;
+  }
+  // save snapshot
+  snapshots.unshift({step:++stepCounter, state:curState, head, tape:[...tape], trans});
+  // apply
+  tape[head] = trans.write;
+  if(trans.dir==='R') head++; else head--;
+  if(head<0){ tape.unshift('B'); head=0; }
+  if(head>=tape.length){ tape.push('B'); }
+  curState = trans.to;
+  // ui
+  renderAll();
+  beep(760,0.05,0.06);
+  highlightTrans(trans);
+  stepInfo.innerHTML = `<div style="font-weight:700">Step ${stepCounter}</div><div style="font-size:13px;color:var(--muted)">${trans.from} — read '${trans.read}' → write '${trans.write}', move ${trans.dir}, goto ${trans.to}</div>`;
+  pushLog(`Step ${stepCounter}: ${trans.from} → ${trans.to} (read ${trans.read})`);
+  if(acceptStates.includes(curState)){
+    statusBox.innerText = 'Accepted ✅';
+    resultBox.innerText = 'Accepted ✅ Final tape: ' + tape.join('');
+    successTune(); successStars(3); confettiBurst();
+    return false;
+  }
+  return true;
+}
+
+function runLoopStart(){
+  if(running) return;
+  running=true; runBtn.disabled=true;
+  runInterval = setInterval(()=>{
+    const ok = tmStep();
+    if(!ok){ clearInterval(runInterval); running=false; runBtn.disabled=false; }
+  }, speed);
+}
+function runLoopPause(){
+  running=false; clearInterval(runInterval); runBtn.disabled=false;
+  pushLog('Paused');
+}
+
+// UI render helpers
+function renderTape(){
+  tapeView.innerHTML = '';
+  for(let i=0;i<tape.length;i++){
+    const d = document.createElement('div');
+    d.className = 'cell' + (i===head? ' head':'') + (tape[i]==='B'?' blank':'');
+    d.innerText = tape[i]==='B' ? 'B' : tape[i];
+    d.addEventListener('click', ()=>{ head = i; curHeadEl.innerText = head; renderAll(); });
+    tapeView.appendChild(d);
+  }
+  curStateBadge.innerText = curState;
+  curHeadEl.innerText = head;
+}
+
+function renderSnapshots(){
+  snapshotsEl.innerHTML = '';
+  for(let s of snapshots.slice(0,20)){
+    const box = document.createElement('div'); box.className='snap';
+    const mini = document.createElement('div'); mini.className='miniTape';
+    for(let i=0;i<s.tape.length;i++){
+      const mc = document.createElement('div'); mc.className='miniCell'; mc.innerText = s.tape[i]==='B'?'B':s.tape[i];
+      if(i===s.head){ mc.style.border = '2px solid #6c63ff'; }
+      mini.appendChild(mc);
+    }
+    const txt = document.createElement('div'); txt.style.marginLeft='8px'; txt.innerHTML = `<div style="font-weight:700">Step ${s.step}</div><div style="font-size:13px;color:var(--muted)">${s.state} → ${s.trans.to}</div>`;
+    box.appendChild(mini); box.appendChild(txt);
+    snapshotsEl.appendChild(box);
+  }
+}
+
+function renderTransList(){
+  transList.innerHTML = '';
+  transitions.forEach((t, idx)=>{
+    const r = document.createElement('div'); r.className='transRow'; r.style.display='flex'; r.style.justifyContent='space-between'; r.style.alignItems='center'; r.style.padding='6px'; r.style.border='1px solid #eef4ff'; r.style.borderRadius='8px';
+    r.innerHTML = `<div style="font-weight:700">${t.from}</div><div style="color:var(--muted)">${t.read} → ${t.write}, ${t.dir}</div><div style="color:var(--muted)">${t.to}</div>`;
+    const del = document.createElement('button'); del.className='btn ghost'; del.style.padding='6px 8px'; del.innerText='Delete'; del.addEventListener('click', ()=>{ transitions.splice(idx,1); renderAll(); });
+    r.appendChild(del);
+    transList.appendChild(r);
+  });
+}
+
+function renderTransTable(){
+  transTable.innerHTML = '';
+  transitions.forEach((t,idx)=>{
+    const row = document.createElement('div'); row.style.display='flex'; row.style.justifyContent='space-between'; row.style.padding='8px'; row.style.border='1px solid #eef2ff'; row.style.borderRadius='8px'; row.style.marginBottom='6px';
+    row.innerHTML = `<div style="font-weight:800">${t.from}</div><div style="color:var(--muted)">${t.read} → ${t.write}, ${t.dir}</div><div style="font-weight:700">${t.to}</div>`;
+    row.addEventListener('click', ()=>{ if(confirm('Delete this transition?')){ transitions.splice(idx,1); renderAll(); }});
+    transTable.appendChild(row);
+  });
+}
+
+function renderSVG(){
+  svgWrap.innerHTML = '';
+  // simple layout: place states in circle or grid
+  const svgns = 'http://www.w3.org/2000/svg';
+  const w = 320, h = 260;
+  const svg = document.createElementNS(svgns,'svg'); svg.setAttribute('viewBox', `0 0 ${w} ${h}`); svg.style.background='transparent';
+  // gather states
+  const states = new Set();
+  transitions.forEach(t=>{ states.add(t.from); states.add(t.to); });
+  acceptStates.forEach(s=>states.add(s));
+  states.add(startState);
+  const list = Array.from(states);
+  // positions
+  const cx = w/2, cy = h/2, r = Math.min(w,h)/3;
+  const pos = {};
+  list.forEach((s,i)=>{
+    const a = (i/list.length) * Math.PI*2 - Math.PI/2;
+    pos[s] = {x: cx + Math.cos(a)*r, y: cy + Math.sin(a)*r};
+  });
+  // edges
+  transitions.forEach((t,idx)=>{
+    const from = pos[t.from], to = pos[t.to];
+    if(!from || !to) return;
+    const path = document.createElementNS(svgns,'path');
+    const mx = (from.x + to.x)/2, my = (from.y + to.y)/2;
+    const d = `M ${from.x} ${from.y} Q ${mx} ${my-20} ${to.x} ${to.y}`;
+    path.setAttribute('d', d);
+    path.setAttribute('stroke', '#60a5fa'); path.setAttribute('stroke-width','3'); path.setAttribute('fill','none'); path.setAttribute('class','edgeLine');
+    path.style.opacity = (curState===t.from?1:0.12);
+    path.id = 'edge_'+idx;
+    svg.appendChild(path);
+    // label
+    const tx = document.createElementNS(svgns,'text'); tx.setAttribute('x',(from.x+to.x)/2+6); tx.setAttribute('y',(from.y+to.y)/2 - 6); tx.setAttribute('font-size','12'); tx.textContent = `${t.read}→${t.write},${t.dir}`;
+    svg.appendChild(tx);
+  });
+  // nodes
+  list.forEach(s=>{
+    const p = pos[s];
+    const g = document.createElementNS(svgns,'g');
+    const circ = document.createElementNS(svgns,'circle'); circ.setAttribute('cx',p.x); circ.setAttribute('cy',p.y); circ.setAttribute('r',22);
+    circ.setAttribute('fill', curState===s? '#c7baff':'#fff'); circ.setAttribute('stroke','#c7d2fe'); circ.setAttribute('stroke-width',3);
+    g.appendChild(circ);
+    const tx = document.createElementNS(svgns,'text'); tx.setAttribute('x',p.x); tx.setAttribute('y',p.y+6); tx.setAttribute('font-size','12'); tx.setAttribute('text-anchor','middle'); tx.textContent = s;
+    g.appendChild(tx);
+    if(acceptStates.includes(s)){
+      const circ2 = document.createElementNS(svgns,'circle'); circ2.setAttribute('cx',p.x); circ2.setAttribute('cy',p.y); circ2.setAttribute('r',26); circ2.setAttribute('fill','none'); circ2.setAttribute('stroke','#a7f3d0'); circ2.setAttribute('stroke-width',3);
+      g.appendChild(circ2);
+    }
+    svg.appendChild(g);
+  });
+
+  svgWrap.appendChild(svg);
+}
+
+// highlight transition visually
+function highlightTrans(t){
+  // highlight row
+  document.querySelectorAll('#transTable .highlighted').forEach(e=>e.classList.remove('highlighted'));
+  // highlight edge
+  document.querySelectorAll('.edgeLine').forEach(el=>el.style.opacity = 0.12);
+  transitions.forEach((tr,idx)=>{
+    if(tr === t){
+      const edge = document.getElementById('edge_'+idx);
+      if(edge) edge.style.opacity = 1;
+    }
+  });
+}
+
+// render all UI
+function renderAll(){
+  renderTape(); renderSnapshots(); renderTransList(); renderTransTable(); renderSVG();
+  curStateBadge.innerText = curState; curHeadEl.innerText = head;
+}
+
+// step/run UI wiring
+genBtn.addEventListener('click', ()=>{ if(audioCtx.state==='suspended') audioCtx.resume(); generateMachine(); });
+stepBtn.addEventListener('click', ()=>{ if(audioCtx.state==='suspended') audioCtx.resume(); tmStep(); });
+runBtn.addEventListener('click', ()=>{ if(audioCtx.state==='suspended') audioCtx.resume(); runLoopStart(); });
+pauseBtn.addEventListener('click', ()=>{ runLoopPause(); });
+resetBtn.addEventListener('click', ()=>{ runLoopPause(); const built = buildTapeFromInput(inputTape.value) || ['B','B','B']; tape = [...built]; head = 1; curState = startState; snapshots=[]; stepCounter=0; renderAll(); resultBox.innerText='Reset — ready'; statusBox.innerText='Reset'; });
+
+// add transition from editor
+addTransBtn.addEventListener('click', ()=>{
+  const from = (tFrom.value||'').trim(); const read = (tRead.value||'').trim() || 'B';
+  const write = (tWrite.value||'').trim() || read; const dir = (tDir.value||'R'); const to = (tTo.value||'').trim() || 'qf';
+  if(!from){ alert('Enter from state'); return; }
+  transitions.push({from, read, write, dir, to});
+  tFrom.value=''; tRead.value=''; tWrite.value=''; tTo.value='';
+  renderAll();
+});
+
+// clear transitions
+clearTransBtn.addEventListener('click', ()=>{ if(confirm('Clear all transitions?')){ transitions=[]; renderAll(); }});
+
+// export/import
+exportBtn.addEventListener('click', ()=>{
+  const data = { tape, head, curState, startState, acceptStates, transitions, snapshots };
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='tm_puzzle.json'; a.click();
+});
+fileImport.addEventListener('change', (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader(); r.onload = ()=>{ try{
+    const d = JSON.parse(r.result);
+    tape = d.tape || tape; head = d.head || head; curState = d.curState || curState; startState = d.startState || startState;
+    transitions = d.transitions || transitions; acceptStates = d.acceptStates || acceptStates; snapshots = d.snapshots || snapshots;
+    stepCounter = snapshots.length? snapshots[0].step : 0;
+    renderAll(); pushLog('Imported puzzle'); statusBox.innerText='Imported';
+  }catch(err){ alert('Invalid JSON'); }}; r.readAsText(f);
+});
+
+// auto-fix simple hints (adds missing trivial transitions)
+autoFix.addEventListener('click', ()=>{
+  // heuristic: if machine halts due to missing transition on curState,sym add a simple "move right" rule to proceed
+  const sym = tape[head] || 'B';
+  if(findTransition(curState, sym)) { alert('No missing transition at current position.'); return; }
+  const guess = prompt(`No rule for ${curState} reading ${sym}. Add guess transition like: write(${sym}) dir R to ${curState}? Enter destination (q0/qf...)`, 'q0');
+  if(guess){
+    transitions.push({from:curState, read:sym, write:sym, dir:'R', to:guess});
+    renderAll(); pushLog('Auto-fixed by adding a hint transition.');
+  }
+});
+
+// confetti animation
+function confettiBurst(){
+  const container = document.getElementById('confetti');
+  for(let i=0;i<60;i++){
+    const el = document.createElement('div'); el.style.position='absolute'; el.style.left = Math.random()*100 + '%'; el.style.top='-10%';
+    el.style.width = (6+Math.random()*8)+'px'; el.style.height = (8+Math.random()*8)+'px'; el.style.background = ['#ff7ab6','#ffd166','#6c63ff','#00c2a8'][Math.floor(Math.random()*4)];
+    el.style.opacity = 0.95; el.style.borderRadius = '2px';
+    el.style.transform = `rotate(${Math.random()*360}deg)`;
+    el.style.transition = 'transform 2.5s linear, top 2.5s linear, left 2.5s linear, opacity 2.5s linear';
+    container.appendChild(el);
+    setTimeout(()=>{ el.style.top = 100 + Math.random()*30 + '%'; el.style.left = (Math.random()*100) + '%'; el.style.opacity = 0; el.style.transform = 'rotate(720deg)'; }, 10);
+    setTimeout(()=> el.remove(), 2800);
+  }
+}
+
+// confetti on success (call confettiBurst), show stars
+function successStars(n){
+  document.getElementById('achievements').innerText = `⭐️ ${n} / 3`;
+}
+
+// initial generate
+(function init(){
+  generateMachine();
+  renderAll();
+})();
+</script>
+</body>
+</html>

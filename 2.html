@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Turing Quest — Visual Turing Machine & Automata Studio</title>
+
+<style>
+:root{
+  --bg-1:#02060a; --bg-2:#07121a;
+  --accent1:#00d4ff; --accent2:#8b5cf6;
+  --glass: rgba(255,255,255,0.06);
+  --mono: ui-monospace, "Roboto Mono", monospace;
+  font-family: Inter, system-ui;
+}
+
+html, body{
+  margin:0;
+  scroll-behavior: smooth;
+  background:
+    radial-gradient(1200px 800px at 10% 20%, rgba(6,182,212,0.12), transparent 12%),
+    radial-gradient(900px 600px at 80% 70%, rgba(139,92,246,0.08), transparent 12%),
+    linear-gradient(180deg,var(--bg-1),var(--bg-2));
+  color:white;
+}
+
+/* Container */
+.container{max-width:1200px; margin:0 auto; padding:28px;}
+
+/* Navbar */
+nav.top {
+  position:fixed; left:50%; transform:translateX(-50%); top:18px; z-index:40;
+  width:95%; max-width:1200px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px; padding:12px 20px;
+  backdrop-filter: blur(8px);
+  display:flex; align-items:center; justify-content:space-between;
+}
+
+.logo{
+  font-weight:900; font-size:20px; background:linear-gradient(90deg,var(--accent1),var(--accent2));
+  -webkit-background-clip:text; color:transparent;
+}
+
+.nav-links {
+  display:flex; gap:20px; font-weight:600; align-items:center;
+}
+
+.nav-links a{
+  text-decoration:none; color:white; padding:8px 14px; border-radius:8px;
+  transition:0.2s;
+}
+.nav-links a:hover{
+  background: rgba(0,212,255,0.2);
+  color: #00d4ff;
+}
+
+.nav-links .demo-btn{
+  background: linear-gradient(90deg,var(--accent1),#3b82f6);
+  padding:10px 18px;
+  border-radius:12px;
+  font-weight:700;
+  color:#021019;
+}
+
+/* Hero Section */
+.hero{
+  display:flex; flex-wrap:wrap; gap:40px; padding-top:100px; align-items:flex-start;
+}
+.hero-left{flex:1 1 450px;}
+.hero-left h1{
+  font-size:70px; line-height:1.05; font-weight:900; margin:0; 
+  background:linear-gradient(90deg,var(--accent1),#60a5fa 50%,var(--accent2)); 
+  -webkit-background-clip:text; color:transparent;
+}
+.hero-left p.subtitle{
+  margin-top:12px; font-size:22px; font-weight:600;
+}
+.hero-left p.description{
+  margin-top:10px; font-size:18px; color:rgba(255,255,255,0.75); line-height:1.5;
+}
+.hero-actions{margin-top:22px;}
+.btn-primary{
+  padding:14px 22px; border-radius:12px; font-weight:800; font-size:16px;
+  background:linear-gradient(90deg,var(--accent1),#3b82f6);
+  border:none; cursor:pointer; transition:transform 0.15s;
+}
+.btn-primary:active{transform:translateY(1px);}
+
+/* Panel */
+.panel{
+  flex:1 1 520px;
+  border-radius:18px; padding:22px 20px 20px;
+  background:linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.009));
+  border:1px solid rgba(255,255,255,0.03);
+  box-shadow:0 20px 40px rgba(2,6,10,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+  min-height:520px; position:relative; overflow:hidden;
+}
+
+.panel-title{
+  text-align:center; font-size:22px; font-weight:700;
+  margin-bottom:14px; background:linear-gradient(90deg,var(--accent1),var(--accent2));
+  -webkit-background-clip:text; color:transparent;
+}
+
+/* FA Blobs & particles */
+.blob{position:absolute; border-radius:50%; filter:blur(80px); opacity:0.35; pointer-events:none;}
+.blob.a{width:700px;height:700px; left:50%; top:40%; transform:translate(-50%,-50%); background: radial-gradient(circle, rgba(102,126,234,0.85), rgba(6,182,212,0.35) 40%, transparent 80%);}
+.blob.b{width:550px;height:550px; right:5%; top:18%; background: radial-gradient(circle, rgba(59,130,246,0.8), rgba(168,85,247,0.28) 50%, transparent 90%);}
+
+.particle{position:absolute; width:6px;height:6px;border-radius:50%; background:rgba(255,255,255,0.25); animation: float 6s infinite ease-in-out;}
+@keyframes float{0%{transform:translateY(0px);opacity:0.3;}50%{transform:translateY(-20px);opacity:0.6;}100%{transform:translateY(0px);opacity:0.3;}}
+
+/* Big Tape */
+.big-tape{margin:14px auto 0;width:92%; background:rgba(255,255,255,0.025); border:1px solid rgba(0,212,255,0.35); padding:16px; border-radius:14px; display:flex; justify-content:center; gap:12px;}
+.big-cell{width:52px;height:52px; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:20px; color:white;}
+
+/* TM Tools */
+.tm-tools{margin-top:18px; display:flex; gap:34px; justify-content:center;}
+.tm-tool{text-align:center;}
+.tm-btn{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg, rgba(0,212,255,0.22), rgba(139,92,246,0.22)); border:1px solid rgba(0,212,255,0.35); box-shadow:0 0 14px rgba(0,212,255,0.25), inset 0 0 8px rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; color:white; font-size:28px; cursor:pointer; transition:0.2s;}
+.tm-btn:hover{transform:translateY(-4px); box-shadow:0 0 22px rgba(0,212,255,0.55), inset 0 0 8px rgba(0,0,0,0.5); border-color:var(--accent1);}
+.tm-label{margin-top:6px; font-size:14px; color:rgba(255,255,255,0.75);}
+
+/* FA SVG pulse */
+@keyframes pulse {0%{transform:scale(1);}50%{transform:scale(1.03);}100%{transform:scale(1);} }
+.pulse-slow{animation:pulse 3s infinite ease-in-out;}
+
+/* Separator */
+.separator{
+  width:92%; margin:8px auto 18px; height:1px;
+  background:linear-gradient(90deg, transparent, rgba(0,212,255,0.35), transparent);
+}
+
+/* Features Section */
+#features{
+  padding:80px 28px 40px;
+}
+.features-heading{text-align:center; font-size:36px; font-weight:900; background:linear-gradient(90deg,var(--accent1),var(--accent2)); -webkit-background-clip:text; color:transparent;}
+.features-subtitle{text-align:center; font-size:18px; color:rgba(255,255,255,0.7); margin-bottom:40px;}
+.features-grid{
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px,1fr));
+  gap:24px;
+}
+.feature-card{
+  background: rgba(255,255,255,0.03);
+  border:1px solid rgba(0,212,255,0.25);
+  border-radius:16px; padding:22px;
+  transition:0.3s; display:flex; flex-direction:column; gap:12px;
+}
+.feature-card:hover{border-color:var(--accent1); box-shadow:0 0 20px rgba(0,212,255,0.35);}
+.feature-icon{font-size:32px; width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, var(--accent2), var(--accent1)); color:white; margin-bottom:8px;}
+.feature-title{font-size:20px; font-weight:700;}
+.feature-list{margin-top:6px; display:flex; flex-direction:column; gap:6px;}
+.feature-list li{font-size:15px; color:rgba(255,255,255,0.75); line-height:1.4; list-style:none; position:relative; padding-left:22px;}
+.feature-list li::before{
+  content:'✓'; position:absolute; left:0; color:#00d4ff;
+}
+
+/* Responsive */
+@media(max-width:900px){.hero{flex-direction:column;}}
+</style>
+</head>
+
+<body>
+<!-- Navbar -->
+<nav class="top">
+  <div class="logo">Turing Quest</div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#learn">Learn</a>
+    <a href="#howto">How To</a>
+    <a href="#demo" class="demo-btn">Watch Demo</a>
+  </div>
+</nav>
+
+
+
+<!-- Hero Section -->
+<div class="container hero">
+  <div class="hero-left">
+    <h1>Turing Quest</h1>
+    <p class="subtitle">Your Journey Through States and Transitions</p>
+    <p class="description">Turing Quest, an educational platform where students learn how a Turing Machine works by interacting with tapes, states, and transitions.</p>
+    <p class="description">Providing an educational yet playful experience.</p>
+    <div class="hero-actions">
+      <button class="btn-primary">Start Simulating</button>
+    </div>
+  </div>
+
+  <!-- Machine Preview Panel -->
+  <div class="panel">
+    <div class="panel-title">Machine Preview</div>
+
+    <div class="blob a"></div>
+    <div class="blob b"></div>
+
+    <!-- Particles -->
+    <div class="particle" style="top:30%; left:22%; animation-delay:0s;"></div>
+    <div class="particle" style="top:55%; left:70%; animation-delay:1s;"></div>
+    <div class="particle" style="top:70%; left:40%; animation-delay:2s;"></div>
+
+    <!-- FA SVG -->
+    <div style="transform:scale(1.08); transform-origin:center;">
+      <svg viewBox="0 0 600 300" width="100%" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+            <polygon points="0 0, 10 4, 0 8" fill="#06b6d4"></polygon>
+          </marker>
+        </defs>
+        <g class="pulse-slow">
+          <circle cx="140" cy="150" r="40" fill="rgba(255,255,255,0.03)" stroke="#06b6d4" stroke-width="3"/>
+          <text x="140" y="155" fill="#fff" font-size="18" text-anchor="middle" font-weight="700">q0</text>
+          <circle cx="140" cy="150" r="48" fill="none" stroke="#06b6d4" stroke-width="2" stroke-dasharray="5,5"/>
+        </g>
+        <g class="pulse-slow" style="animation-delay:0.4s;">
+          <circle cx="300" cy="150" r="40" fill="rgba(255,255,255,0.03)" stroke="#06b6d4" stroke-width="3"/>
+          <text x="300" y="155" fill="#fff" font-size="18" text-anchor="middle">q1</text>
+        </g>
+        <g class="pulse-slow" style="animation-delay:0.7s;">
+          <circle cx="460" cy="150" r="40" fill="rgba(255,255,255,0.03)" stroke="#06b6d4" stroke-width="3"/>
+          <text x="460" y="155" fill="#fff" font-size="18" text-anchor="middle">q2</text>
+        </g>
+        <path d="M 180 150 L 260 150" stroke="#06b6d4" stroke-width="2.5" marker-end="url(#arrow)"></path>
+        <text x="220" y="140" fill="#fff" text-anchor="middle">a / a, R</text>
+        <path d="M 340 150 L 420 150" stroke="#06b6d4" stroke-width="2.5" marker-end="url(#arrow)"></path>
+        <text x="380" y="140" fill="#fff" text-anchor="middle">b / b, R</text>
+        <path d="M 300 110 Q 300 60 220 60 Q 140 60 150 110" stroke="#06b6d4" stroke-width="2.5" fill="none" marker-end="url(#arrow)"></path>
+        <text x="230" y="45" fill="#fff" text-anchor="middle">0 / B, L</text>
+      </svg>
+    </div>
+
+    <!-- Separator -->
+    <div class="separator"></div>
+
+    <!-- Big Tape -->
+    <div class="big-tape">
+      <div class="big-cell">_</div>
+      <div class="big-cell">1</div>
+      <div class="big-cell">0</div>
+      <div class="big-cell">1</div>
+      <div class="big-cell">1</div>
+      <div class="big-cell">_</div>
+    </div>
+
+    <!-- TM Tools -->
+    <div class="tm-tools">
+      <div class="tm-tool">
+        <div class="tm-btn">🔁</div>
+        <div class="tm-label">Palindrome</div>
+      </div>
+      <div class="tm-tool">
+        <div class="tm-btn">➕</div>
+        <div class="tm-label">Addition</div>
+      </div>
+      <div class="tm-tool">
+        <div class="tm-btn">➖</div>
+        <div class="tm-label">Subtraction</div>
+      </div>
+      <div class="tm-tool">
+        <div class="tm-btn">⬆</div>
+        <div class="tm-label">Increment</div>
+      </div>
+      <div class="tm-tool">
+        <div class="tm-btn">⬇</div>
+        <div class="tm-label">Decrement</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Features Section -->
+<section id="features">
+  <h2 class="features-heading">Everything you need to start the quest</h2>
+  <p class="features-subtitle">Comprehensive tools for learning and exploring formal computation</p>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🎥</div>
+      <div class="feature-title">Free Videos for Reference</div>
+      <ul class="feature-list">
+        <li>Watch videos explaining Turing Machines, DFA, and NFA</li>
+        <li>Step-by-step examples to follow along</li>
+        <li>Covers both theory and practical simulations</li>
+        <li>Helps understand complex concepts visually</li>
+        <li>Optional quizzes to test understanding</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🧩</div>
+      <div class="feature-title">Puzzle-like Simulator</div>
+      <ul class="feature-list">
+        <li>Interactive exercises that challenge students</li>
+        <li>Encourages experimenting with states and transitions</li>
+        <li>Immediate visual feedback on actions</li>
+        <li>Gradually increases in difficulty to build mastery</li>
+        <li>Gamified approach to learning computation</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📄</div>
+      <div class="feature-title">Tape for Any String Input</div>
+      <ul class="feature-list">
+        <li>Load any string you want to test</li>
+        <li>Visualize read/write head movements</li>
+        <li>Observe how your Turing Machine processes inputs</li>
+        <li>Supports multiple examples simultaneously</li>
+        <li>Helps understand step-by-step computation</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">⚠️</div>
+      <div class="feature-title">Error Detection</div>
+      <ul class="feature-list">
+        <li>Highlights invalid transitions instantly</li>
+        <li>Provides suggestions for correction</li>
+        <li>Helps prevent common mistakes</li>
+        <li>Encourages trial-and-error learning</li>
+        <li>Ensures correct FA / TM design</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔗</div>
+      <div class="feature-title">Loops, States, Transitions, Arrows, Labeling</div>
+      <ul class="feature-list">
+        <li>Draw states and loops intuitively</li>
+        <li>Add transitions and label them clearly</li>
+        <li>Visual clarity with arrows and colors</li>
+        <li>Supports complex machine designs</li>
+        <li>Helps students learn diagrammatic representation</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">▶️</div>
+      <div class="feature-title">Run Simulated Finite Automata</div>
+      <ul class="feature-list">
+        <li>Execute your designed machine in real-time</li>
+        <li>Step through each tape movement and transition</li>
+        <li>Observe acceptance or rejection of strings</li>
+        <li>Supports multiple executions for practice</li>
+        <li>Helps reinforce learning via simulation</li>
+      </ul>
+    </div>
+  </div>
+</section>
+</body>
+</html>

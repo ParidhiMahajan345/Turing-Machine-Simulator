@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Turing Quest — Dynamic TM</title>
+<style>
+:root{
+  --bg1:#02060a; --bg2:#07121a;
+  --accent:#00d4ff; --accent2:#8b5cf6;
+  --glass-bg: rgba(255,255,255,0.1);
+  font-family:Inter, Arial, sans-serif;
+}
+html,body{
+  height:100%; margin:0;
+  background:linear-gradient(135deg,var(--bg1),var(--bg2));
+  color:white;
+}
+header{
+  padding:18px 22px;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.logo{
+  font-weight:900;
+  font-size:20px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;
+  color:transparent;
+}
+.container{
+  max-width:1300px;
+  margin:22px auto;
+  padding:0 20px;
+}
+canvas{
+  background:rgba(0,0,0,0.35);
+  border-radius:12px;
+  box-shadow:0 10px 28px rgba(0,0,0,.6);
+}
+.footer{
+  margin-top:12px;
+  font-size:13px;
+  color:rgba(255,255,255,.6);
+}
+.tape-box{
+  background:rgba(0,0,0,0.35);
+  padding:16px;
+  border-radius:14px;
+  margin-bottom:16px;
+}
+.tape-row{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.cell{
+  width:42px;
+  height:42px;
+  border-radius:8px;
+  background:rgba(255,255,255,0.07);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:monospace;
+  font-size:18px;
+}
+.cell.active{
+  background:#00d4ff;
+  color:#021019;
+  font-weight:bold;
+}
+.tape-box input{
+  padding:6px;
+  width:180px;
+}
+.tape-box button{
+  margin-left:6px;
+  padding:6px 10px;
+}
+#completionPopup{
+  position:fixed;
+  top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  padding:30px 50px;
+  background:rgba(255,255,255,0.1);
+  backdrop-filter:blur(12px);
+  border:1px solid rgba(0,212,255,0.3);
+  border-radius:16px;
+  text-align:center;
+  font-size:22px;
+  font-weight:bold;
+  color:#00d4ff;
+  display:none;
+  box-shadow:0 10px 20px rgba(0,0,0,0.5);
+}
+table{
+  border-collapse:collapse;
+  width:100%;
+}
+th, td{
+  border:1px solid #00d4ff;
+  padding:4px;
+  text-align:center;
+  font-size:14px;
+}
+th{
+  background:rgba(0,212,255,0.2);
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Turing Quest — Dynamic TM</div>
+</header>
+<div class="container">
+<div class="tape-box">
+  <div style="margin-bottom:6px;font-weight:bold">Input Tape</div>
+  <div class="tape-row" id="inputTape"></div>
+
+  <div style="margin:10px 0 6px;font-weight:bold">Output Tape</div>
+  <div class="tape-row" id="outputTape"></div>
+
+  <div style="margin-top:10px">
+    Manual Input (Binary Number):
+    <input id="manualInput" placeholder="101">
+    <button onclick="loadInput()">Load Input</button>
+    <button onclick="runMachine()">Run Machine</button>
+  </div>
+</div>
+
+<div class="tape-box">
+  <div style="margin-bottom:6px;font-weight:bold">Transition Table (Auto-generated)</div>
+  <table>
+    <thead>
+      <tr>
+        <th>From</th>
+        <th>To</th>
+        <th>Read</th>
+        <th>Write</th>
+        <th>Move</th>
+      </tr>
+    </thead>
+    <tbody id="transitionBody"></tbody>
+  </table>
+</div>
+
+<canvas id="canvas" width="1100" height="520"></canvas>
+<div class="footer">TM diagram builds itself as the machine runs</div>
+
+<div id="completionPopup">Turing Machine Completed!</div>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let states = [];
+let transitions = [];
+let stateCounter = 0;
+
+let inputTapeData = [];
+let outputTapeData = [];
+let head = 0;
+let currentState = "";
+let timer = null;
+const R = 28;
+
+function drawArrow(x,y,a){
+  ctx.fillStyle = "#00d4ff";
+  const s=12;
+  ctx.beginPath();
+  ctx.moveTo(x,y);
+  ctx.lineTo(x-s*Math.cos(a-Math.PI/6),y-s*Math.sin(a-Math.PI/6));
+  ctx.lineTo(x-s*Math.cos(a+Math.PI/6),y-s*Math.sin(a+Math.PI/6));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawLabel(text,x,y){
+  ctx.save();
+  ctx.font="12px monospace";
+  ctx.lineWidth=2;
+  ctx.strokeStyle="rgba(0,0,0,0.7)";
+  ctx.strokeText(text,x,y);
+  ctx.fillStyle="#00d4ff";
+  ctx.fillText(text,x,y);
+  ctx.restore();
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const map={};
+  transitions.forEach(t=>{
+    (map[t.from+"->"+t.to]=map[t.from+"->"+t.to]||[]).push(t);
+  });
+
+  for(const key in map){
+    const list=map[key];
+    const f=states.find(s=>s.name===list[0].from);
+    const t=states.find(s=>s.name===list[0].to);
+    if(!f||!t) continue;
+
+    ctx.strokeStyle="#00d4ff"; 
+    ctx.lineWidth=2;
+
+    if(f===t){
+      ctx.beginPath();
+      ctx.arc(f.x,f.y-60,34,0.3*Math.PI,2.7*Math.PI);
+      ctx.stroke();
+      drawArrow(f.x+34,f.y-60,Math.PI/2);
+      list.forEach((e,i)=>drawLabel(`${e.read}/${e.write},${e.move}`,f.x-30,f.y-100-i*14));
+      continue;
+    }
+
+    const dx=t.x-f.x, dy=t.y-f.y;
+    const ang=Math.atan2(dy,dx);
+    const dist=Math.hypot(dx,dy);
+    const sx=f.x+R*Math.cos(ang);
+    const sy=f.y+R*Math.sin(ang);
+    const ex=t.x-R*Math.cos(ang);
+    const ey=t.y-R*Math.sin(ang);
+    const mx=(sx+ex)/2 - 60*Math.sin(ang);
+    const my=(sy+ey)/2 + 60*Math.cos(ang);
+
+    ctx.beginPath();
+    ctx.moveTo(sx,sy);
+    ctx.quadraticCurveTo(mx,my,ex,ey);
+    ctx.stroke();
+    drawArrow(ex,ey,Math.atan2(ey-my,ex-mx));
+
+    list.forEach((e,i)=>drawLabel(`${e.read}/${e.write},${e.move}`,mx+10,my+10*i));
+  }
+
+  states.forEach(s=>{
+    ctx.fillStyle = (s.name===currentState)?"#00ff80":"#00d4ff";
+    ctx.beginPath();
+    ctx.arc(s.x,s.y,R,0,Math.PI*2);
+    ctx.fill();
+    if(s.final){
+      ctx.strokeStyle="#021019";
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,R-6,0,Math.PI*2);
+      ctx.stroke();
+    }
+    ctx.fillStyle="#021019";
+    ctx.fillText(s.name,s.x-8,s.y+4);
+  });
+}
+
+// -------------------- Tape Rendering --------------------
+function renderTape(){
+  inputTape.innerHTML = "";
+  outputTape.innerHTML = "";
+
+  inputTapeData.forEach(sym=>{
+    const c=document.createElement("div");
+    c.className="cell";
+    c.textContent=sym;
+    inputTape.appendChild(c);
+  });
+
+  outputTapeData.forEach((sym,i)=>{
+    const c=document.createElement("div");
+    c.className="cell"+(i===head?" active":"");
+    c.textContent=sym;
+    outputTape.appendChild(c);
+  });
+}
+
+// -------------------- Load Input --------------------
+function loadInput(){
+  const val=manualInput.value.trim();
+  if(!/^[01]+$/.test(val)){ alert("Enter valid binary number"); return; }
+  inputTapeData=["_",...val.split(""),"_"];
+  outputTapeData=[...inputTapeData];
+  head=1; currentState="q0";
+  states=[]; transitions=[]; stateCounter=0;
+  renderTape(); draw(); updateTransitionTable();
+}
+
+// -------------------- TM Step --------------------
+function tmStep(){
+  if(head<0){ outputTapeData.unshift("_"); head=0; }
+  if(head>=outputTapeData.length){ outputTapeData.push("_"); }
+
+  const read = outputTapeData[head];
+  let nextState = "";
+  let writeSym = read;
+  let moveDir = "S";
+
+  // ----- Correct TM logic for binary increment -----
+  if(currentState==="q0"){
+    if(read==="0"||read==="1"){ nextState="q0"; moveDir="R"; }
+    else if(read==="_"){ nextState="q1"; moveDir="L"; }
+  } else if(currentState==="q1"){
+    if(read==="0"){ writeSym="1"; nextState="qf"; moveDir="S"; }
+    else if(read==="1"){ writeSym="0"; nextState="q1"; moveDir="L"; }
+    else if(read==="_"){ writeSym="1"; nextState="qf"; moveDir="S"; }
+  }
+
+  // Update tape
+  outputTapeData[head]=writeSym;
+  if(moveDir==="R") head++; else if(moveDir==="L") head--;
+
+  // Dynamically add states and transitions
+  if(!states.find(s=>s.name===currentState)){
+    states.push({name:currentState,x:150+stateCounter*250,y:260,final:(currentState==="qf")});
+    stateCounter++;
+  }
+  if(!states.find(s=>s.name===nextState)){
+    states.push({name:nextState,x:150+stateCounter*250,y:260,final:(nextState==="qf")});
+    stateCounter++;
+  }
+  if(!transitions.find(t=>t.from===currentState && t.to===nextState && t.read===read)){
+    transitions.push({from:currentState,to:nextState,read:read,write:writeSym,move:moveDir});
+    updateTransitionTable();
+  }
+
+  currentState = nextState;
+  renderTape();
+  draw();
+
+  return currentState!=="qf";
+}
+
+// -------------------- Run Machine --------------------
+function runMachine(){
+  if(timer) clearInterval(timer);
+  timer = setInterval(()=>{
+    if(!tmStep()){
+      clearInterval(timer);
+      timer=null;
+      document.getElementById("completionPopup").style.display="block";
+    }
+  },600);
+}
+
+// -------------------- Update Transition Table --------------------
+function updateTransitionTable(){
+  const tbody=document.getElementById("transitionBody");
+  tbody.innerHTML="";
+  transitions.forEach(t=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${t.from}</td><td>${t.to}</td><td>${t.read}</td><td>${t.write}</td><td>${t.move}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Turing Quest — Visual Turing Machine & Automata Studio</title>
+
+<style>
+:root{
+  --bg-1:#02060a; --bg-2:#07121a;
+  --accent1:#00d4ff; --accent2:#8b5cf6;
+  --glass: rgba(255,255,255,0.06);
+  --mono: ui-monospace, "Roboto Mono", monospace;
+  font-family: Inter, system-ui;
+}
+
+html, body{
+  margin:0;
+  scroll-behavior: smooth;
+  background:
+    radial-gradient(1200px 800px at 10% 20%, rgba(6,182,212,0.12), transparent 12%),
+    radial-gradient(900px 600px at 80% 70%, rgba(139,92,246,0.08), transparent 12%),
+    linear-gradient(180deg,var(--bg-1),var(--bg-2));
+  color:white;
+}
+
+/* Container */
+.container{max-width:1200px; margin:0 auto; padding:28px;}
+
+/* Navbar */
+nav.top {
+  position:fixed; left:50%; transform:translateX(-50%); top:18px; z-index:40;
+  width:95%; max-width:1200px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px; padding:12px 20px;
+  backdrop-filter: blur(8px);
+  display:flex; align-items:center; justify-content:space-between;
+}
+
+.logo{
+  font-weight:900; font-size:20px; background:linear-gradient(90deg,var(--accent1),var(--accent2));
+  -webkit-background-clip:text; color:transparent;
+}
+
+.nav-links {
+  display:flex; gap:20px; font-weight:600; align-items:center;
+}
+
+.nav-links a{
+  text-decoration:none; color:white; padding:8px 14px; border-radius:8px;
+  transition:0.2s;
+}
+.nav-links a:hover{
+  background: rgba(0,212,255,0.2);
+  color: #00d4ff;
+}
+
+.nav-links .demo-btn{
+  background: linear-gradient(90deg,var(--accent1),#3b82f6);
+  padding:10px 18px;
+  border-radius:12px;
+  font-weight:700;
+  color:#021019;
+}
+
+/* Hero Section */
+.hero{
+  display:flex; flex-wrap:wrap; gap:40px; padding-top:100px; align-items:flex-start;
+}
+.hero-left{flex:1 1 450px;}
+.hero-left h1{
+  font-size:70px; line-height:1.05; font-weight:900; margin:0; 
+  background:linear-gradient(90deg,var(--accent1),#60a5fa 50%,var(--accent2)); 
+  -webkit-background-clip:text; color:transparent;
+}
+.hero-left p.subtitle{
+  margin-top:12px; font-size:22px; font-weight:600;
+}
+.hero-left p.description{
+  margin-top:10px; font-size:18px; color:rgba(255,255,255,0.75); line-height:1.5;
+}
+.hero-actions{margin-top:22px;}
+.btn-primary{
+  padding:14px 22px; border-radius:12px; font-weight:800; font-size:16px;
+  background:linear-gradient(90deg,var(--accent1),#3b82f6);
+  border:none; cursor:pointer; transition:transform 0.15s;
+}
+.btn-primary:active{transform:translateY(1px);}
+/* Trust Pointers under Start Button */
+.trust-points{
+  margin-top:20px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+}
+
+.trust-pill{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 14px;
+  border-radius:14px;
+  font-size:14px;
+  font-weight:600;
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(0,212,255,0.25);
+  color:rgba(255,255,255,0.85);
+  cursor:pointer;
+  transition:0.25s ease;
+}
+
+.trust-pill:hover{
+  background:linear-gradient(90deg, rgba(0,212,255,0.25), rgba(139,92,246,0.25));
+  border-color:var(--accent1);
+  color:white;
+}
+
+.trust-pill.active{
+  background:linear-gradient(90deg, var(--accent1), #3b82f6);
+  color:#021019;
+  border-color:transparent;
+}
+
+.trust-icon{
+  font-size:16px;
+}
+
+
+/* Panel */
+.panel{
+  flex:1 1 520px;
+  border-radius:18px; padding:22px 20px 20px;
+  background:linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.009));
+  border:1px solid rgba(255,255,255,0.03);
+  box-shadow:0 20px 40px rgba(2,6,10,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+  min-height:520px; position:relative; overflow:hidden;
+}
+
+.panel-title{
+  text-align:center; font-size:22px; font-weight:700;
+  margin-bottom:14px; background:linear-gradient(90deg,var(--accent1),var(--accent2));
+  -webkit-background-clip:text; color:transparent;
+}
+
+/* FA Blobs & particles */
+.blob{position:absolute; border-radius:50%; filter:blur(80px); opacity:0.35; pointer-events:none;}
+.blob.a{width:700px;height:700px; left:50%; top:40%; transform:translate(-50%,-50%); background: radial-gradient(circle, rgba(102,126,234,0.85), rgba(6,182,212,0.35) 40%, transparent 80%);}
+.blob.b{width:550px;height:550px; right:5%; top:18%; background: radial-gradient(circle, rgba(59,130,246,0.8), rgba(168,85,247,0.28) 50%, transparent 90%);}
+
+.particle{position:absolute; width:6px;height:6px;border-radius:50%; background:rgba(255,255,255,0.25); animation: float 6s infinite ease-in-out;}
+@keyframes float{0%{transform:translateY(0px);opacity:0.3;}50%{transform:translateY(-20px);opacity:0.6;}100%{transform:translateY(0px);opacity:0.3;}}
+
+/* Big Tape */
+.big-tape{margin:14px auto 0;width:92%; background:rgba(255,255,255,0.025); border:1px solid rgba(0,212,255,0.35); padding:16px; border-radius:14px; display:flex; justify-content:center; gap:12px;}
+.big-cell{width:52px;height:52px; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:20px; color:white;}
+
+/* TM Tools */
+.tm-tools{margin-top:18px; display:flex; gap:34px; justify-content:center;}
+.tm-tool{text-align:center;}
+.tm-btn{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg, rgba(0,212,255,0.22), rgba(139,92,246,0.22)); border:1px solid rgba(0,212,255,0.35); box-shadow:0 0 14px rgba(0,212,255,0.25), inset 0 0 8px rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; color:white; font-size:28px; cursor:pointer; transition:0.2s;}
+.tm-btn:hover{transform:translateY(-4px); box-shadow:0 0 22px rgba(0,212,255,0.55), inset 0 0 8px rgba(0,0,0,0.5); border-color:var(--accent1);}
+.tm-label{margin-top:6px; font-size:14px; color:rgba(255,255,255,0.75);}
+
+/* FA SVG pulse */
+@keyframes pulse {0%{transform:scale(1);}50%{transform:scale(1.03);}100%{transform:scale(1);} }
+.pulse-slow{animation:pulse 3s infinite ease-in-out;}
+
+/* Separator */
+.separator{
+  width:92%; margin:8px auto 18px; height:1px;
+  background:linear-gradient(90deg, transparent, rgba(0,212,255,0.35), transparent);
+}
+
+/* Features Section */
+#features{
+  padding:80px 28px 40px;
+}
+.features-heading{text-align:center; font-size:36px; font-weight:900; background:linear-gradient(90deg,var(--accent1),var(--accent2)); -webkit-background-clip:text; color:transparent;}
+.features-subtitle{text-align:center; font-size:18px; color:rgba(255,255,255,0.7); margin-bottom:40px;}
+.features-grid{
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px,1fr));
+  gap:24px;
+}
+.feature-card{
+  background: rgba(255,255,255,0.03);
+  border:1px solid rgba(0,212,255,0.25);
+  border-radius:16px; padding:22px;
+  transition:0.3s; display:flex; flex-direction:column; gap:12px;
+}
+.feature-card:hover{border-color:var(--accent1); box-shadow:0 0 20px rgba(0,212,255,0.35);}
+.feature-icon{font-size:32px; width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, var(--accent2), var(--accent1)); color:white; margin-bottom:8px;}
+.feature-title{font-size:20px; font-weight:700;}
+.feature-list{margin-top:6px; display:flex; flex-direction:column; gap:6px;}
+.feature-list li{font-size:15px; color:rgba(255,255,255,0.75); line-height:1.4; list-style:none; position:relative; padding-left:22px;}
+.feature-list li::before{
+  content:'✓'; position:absolute; left:0; color:#00d4ff;
+}
+/* ================= MAGIC POPUP UPGRADE ================= */
+
+.magic-overlay{
+  position:fixed;
+  inset:0;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(0,212,255,0.18), transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(139,92,246,0.25), transparent 40%),
+    rgba(0,0,0,0.88);
+  backdrop-filter: blur(12px);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+  animation:fadeIn 0.6s ease;
+}
+
+.magic-popup{
+  width:440px;
+  padding:42px 36px;
+  border-radius:30px;
+  background:linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
+  border:1px solid rgba(255,255,255,0.18);
+  box-shadow:
+    0 40px 120px rgba(0,0,0,0.9),
+    inset 0 0 80px rgba(0,212,255,0.18);
+  text-align:center;
+  position:relative;
+  animation:popupIn 0.9s cubic-bezier(.22,1,.36,1);
+}
+
+.magic-popup h2{
+  font-size:28px;
+  font-weight:900;
+  margin-bottom:30px;
+  background:linear-gradient(90deg,#00d4ff,#8b5cf6);
+  -webkit-background-clip:text;
+  color:transparent;
+}
+
+/* ===== BUTTON ===== */
+.magic-btn{
+  position:relative;
+  width:100%;
+  padding:18px;
+  margin-bottom:16px;
+  border-radius:16px;
+  border:none;
+  background:linear-gradient(135deg,#00d4ff,#3b82f6);
+  color:#021019;
+  font-size:17px;
+  font-weight:800;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  box-shadow:0 12px 30px rgba(0,212,255,0.35);
+  overflow:hidden;
+  transition:0.35s ease;
+}
+
+/* hover shine */
+.magic-btn::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(120deg, transparent, rgba(255,255,255,0.7), transparent);
+  transform:translateX(-120%);
+  transition:0.7s;
+}
+.magic-btn:hover::before{ transform:translateX(120%); }
+
+.magic-btn:hover{
+  transform:translateY(-4px) scale(1.03);
+  box-shadow:0 20px 55px rgba(0,212,255,0.6);
+}
+
+/* ===== ICON ===== */
+.magic-icon{
+  font-size:20px;
+  animation:iconFloat 2.5s ease-in-out infinite;
+}
+
+/* different delays */
+.magic-btn:nth-child(2) .magic-icon{animation-delay:0s}
+.magic-btn:nth-child(3) .magic-icon{animation-delay:.3s}
+.magic-btn:nth-child(4) .magic-icon{animation-delay:.6s}
+.magic-btn:nth-child(5) .magic-icon{animation-delay:.9s}
+
+/* ===== PALINDROME SPECIAL ===== */
+.magic-btn.special{
+  background:linear-gradient(135deg,#8b5cf6,#00d4ff);
+  box-shadow:0 16px 40px rgba(139,92,246,0.6);
+}
+.magic-btn.special .magic-icon{
+  animation:iconPulse 1.8s infinite;
+}
+
+/* cancel */
+.magic-cancel{
+  margin-top:18px;
+  font-size:14px;
+  color:rgba(255,255,255,0.65);
+  cursor:pointer;
+  transition:0.3s;
+}
+.magic-cancel:hover{
+  color:#00d4ff;
+  letter-spacing:1px;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes popupIn{
+  from{opacity:0; transform:scale(0.9) translateY(40px);}
+  to{opacity:1; transform:scale(1) translateY(0);}
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes iconFloat{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-6px)}
+}
+@keyframes iconPulse{
+  0%{transform:scale(1)}
+  50%{transform:scale(1.25)}
+  100%{transform:scale(1)}
+}
+/* HOW TO ICON MAGIC */
+#howto .feature-icon{
+  font-size:36px;
+  animation: floatIcon 4s ease-in-out infinite;
+  box-shadow:0 0 18px rgba(0,212,255,0.5);
+}
+
+#howto .feature-card:hover .feature-icon{
+  transform:scale(1.2) rotate(6deg);
+  box-shadow:0 0 30px rgba(139,92,246,0.9);
+}
+
+@keyframes floatIcon{
+  0%{transform:translateY(0);}
+  50%{transform:translateY(-6px);}
+  100%{transform:translateY(0);}
+}
+.learn-concepts{
+  padding:90px 28px;
+}
+
+.tm-brief{
+  max-width:800px;
+  margin:30px auto 50px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(0,212,255,0.25);
+  border-radius:18px;
+  padding:28px;
+}
+
+.tm-brief h3{
+  margin-top:0;
+  background:linear-gradient(90deg,var(--accent1),var(--accent2));
+  -webkit-background-clip:text;
+  color:transparent;
+}
+
+.tm-brief li{
+  margin-bottom:8px;
+  color:rgba(255,255,255,0.85);
+}
+
+/* ACCORDION */
+.concept-accordion{
+  max-width:900px;
+  margin:auto;
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+}
+
+.concept-item{
+  border-radius:16px;
+  overflow:hidden;
+  border:1px solid rgba(0,212,255,0.3);
+  background:rgba(255,255,255,0.03);
+}
+
+.concept-header{
+  width:100%;
+  padding:18px 22px;
+  font-size:18px;
+  font-weight:700;
+  background:none;
+  border:none;
+  color:white;
+  cursor:pointer;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  transition:0.3s;
+}
+
+.concept-header:hover{
+  background:rgba(0,212,255,0.1);
+  box-shadow:inset 0 0 20px rgba(0,212,255,0.3);
+}
+
+.concept-header span{
+  font-size:22px;
+  transition:0.3s;
+}
+
+.concept-item.open .concept-header span{
+  transform:rotate(45deg);
+}
+
+.concept-body{
+  max-height:0;
+  overflow:hidden;
+  padding:0 22px;
+  transition:0.4s ease;
+}
+
+.concept-item.open .concept-body{
+  max-height:400px;
+  padding:18px 22px 22px;
+}
+
+.concept-body p,
+.concept-body li{
+  color:rgba(255,255,255,0.85);
+}
+.learn-section{
+  padding: 90px 6%;
+  background: radial-gradient(circle at top, #071827, #02060a);
+  text-align: center;
+}
+
+.learn-title{
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: #66b7ff;
+  margin-bottom: 10px;
+}
+
+.learn-subtitle{
+  color: #9dbbd8;
+  margin-bottom: 60px;
+  font-size: 1.05rem;
+}
+
+.learn-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 30px;
+}
+
+.learn-card{
+  position: relative;
+  padding: 30px 25px;
+  border-radius: 18px;
+  background: rgba(0, 140, 255, 0.12);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(120, 190, 255, 0.25);
+  box-shadow: 0 0 25px rgba(0,140,255,0.15);
+  color: #e6f2ff;
+  transition: all 0.45s ease;
+  overflow: hidden;
+}
+
+/* shine sweep */
+.learn-card::before{
+  content:'';
+  position:absolute;
+  top:0;
+  left:-100%;
+  width:100%;
+  height:100%;
+  background: linear-gradient(
+    120deg,
+    transparent,
+    rgba(120,190,255,0.35),
+    transparent
+  );
+  transition: 0.6s;
+}
+
+.learn-card:hover::before{
+  left:100%;
+}
+
+.learn-card:hover{
+  transform: translateY(-12px) scale(1.03);
+  box-shadow: 0 0 45px rgba(0,160,255,0.45);
+}
+
+.learn-icon{
+  font-size: 3.2rem;
+  margin-bottom: 15px;
+  transition: transform 0.4s ease;
+}
+
+.learn-card:hover .learn-icon{
+  transform: rotate(-6deg) scale(1.15);
+}
+
+.learn-card h3{
+  font-size: 1.35rem;
+  margin-bottom: 12px;
+  color: #7ec8ff;
+}
+
+.learn-card p{
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #d6ebff;
+}
+
+
+</style>
+</head>
+
+<body>
+
+<!-- Navbar -->
+<nav class="top">
+  <div class="logo">Turing Quest</div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#learn">Learn</a>
+    <a href="#howto">How To</a>
+   <a href="javascript:void(0)" class="demo-btn" id="tutorialBtn">Tutorial</a>
+</div>
+</nav>
+
+<!-- Hero Section -->
+<div class="container hero">
+  <div class="hero-left">
+    <h1>Turing Quest</h1>
+    <p class="subtitle">Your Journey Through States and Transitions</p>
+    <p class="description">Turing Quest, an educational platform where students learn how a Turing Machine works by interacting with tapes, states, and transitions.</p>
+    <p class="description">Providing an educational yet playful experience.</p>
+    <div class="hero-actions">
+      <button class="btn-primary" id="startBtn">Start Simulating</button>
+<div class="trust-points">
+  <div class="trust-pill"><span class="trust-icon">⬇️</span> No Download</div>
+  <div class="trust-pill"><span class="trust-icon">🔐</span> No Login / Sign Up</div>
+  <div class="trust-pill"><span class="trust-icon">🌐</span> Browser Based</div>
+  <div class="trust-pill"><span class="trust-icon">🎁</span> Free – No Subscription</div>
+  <div class="trust-pill"><span class="trust-icon">🎮</span> Learning Made Fun</div>
+</div>
+
+    </div>
+  </div>
+
+  <!-- Machine Preview Panel -->
+  <div class="panel">
+    <div class="panel-title">Machine Preview</div>
+
+    <div class="blob a"></div>
+    <div class="blob b"></div>
+
+    <!-- Particles -->
+    <div class="particle" style="top:30%; left:22%; animation-delay:0s;"></div>
+    <div class="particle" style="top:55%; left:70%; animation-delay:1s;"></div>
+    <div class="particle" style="top:70%; left:40%; animation-delay:2s;"></div>
+
+    <!-- FA SVG -->
+    <div style="transform:scale(1.08); transform-origin:center;">
+      <svg viewBox="0 0 600 300" width="100%" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+            <polygon points="0 0, 10 4, 0 8" fill="#06b6d4"></polygon>
+          </marker>
+        </defs>
+        <g class="pulse-slow">
+          <circle cx="140" cy="150" r="40" fill="rgba(255,255,255,0.03)" stroke="#06b6d4" stroke-width="3"/>
+          <text x="140" y="155" fill="#fff" font-size="18" text-anchor="middle" font-weight="700">q0</text>
+          <circle cx="140" cy="150" r="48" fill="none" stroke="#06b6d4" stroke-width="2" stroke-dasharray="5,5"/>
+        </g>
+        <g class="pulse-slow" style="animation-delay:0.4s;">
+          <circle cx="300" cy="150" r="40" fill="rgba(255,255,255,0.03)" stroke="#06b6d4" stroke-width="3"/>
+          <text x="300" y="155" fill="#fff" font-size="18" text-anchor="middle">q1</text>
+        </g>
+        <g class="pulse-slow" style="animation-delay:0.7s;">
+          <circle cx="460" cy="150" r="40" fill="rgba(255,255,255,0.03)" stroke="#06b6d4" stroke-width="3"/>
+          <text x="460" y="155" fill="#fff" font-size="18" text-anchor="middle">q2</text>
+        </g>
+        <path d="M 180 150 L 260 150" stroke="#06b6d4" stroke-width="2.5" marker-end="url(#arrow)"></path>
+        <text x="220" y="140" fill="#fff" text-anchor="middle">a / a, R</text>
+        <path d="M 340 150 L 420 150" stroke="#06b6d4" stroke-width="2.5" marker-end="url(#arrow)"></path>
+        <text x="380" y="140" fill="#fff" text-anchor="middle">b / b, R</text>
+        <path d="M 300 110 Q 300 60 220 60 Q 140 60 150 110" stroke="#06b6d4" stroke-width="2.5" fill="none" marker-end="url(#arrow)"></path>
+        <text x="230" y="45" fill="#fff" text-anchor="middle">0 / B, L</text>
+      </svg>
+    </div>
+
+    <!-- Separator -->
+    <div class="separator"></div>
+
+    <!-- Big Tape -->
+    <div class="big-tape">
+      <div class="big-cell">_</div>
+      <div class="big-cell">1</div>
+      <div class="big-cell">0</div>
+      <div class="big-cell">1</div>
+      <div class="big-cell">1</div>
+      <div class="big-cell">_</div>
+    </div>
+
+    <!-- TM Tools -->
+    <div class="tm-tools">
+      <div class="tm-tool">
+        <div class="tm-btn">🔁</div>
+        <div class="tm-label">Palindrome</div>
+      </div>
+       <div class="tm-tool">
+        <div class="tm-btn">⬆</div>
+        <div class="tm-label">Uniary Increment</div>
+      </div>
+      <div class="tm-tool">
+        <div class="tm-btn">⬆</div>
+        <div class="tm-label">Binary Increment</div>
+      </div>
+      <div class="tm-tool">
+        <div class="tm-btn">⬇</div>
+        <div class="tm-label">Uniary Decrement</div>
+      </div>
+<div class="tm-tool">
+        <div class="tm-btn">⬇</div>
+        <div class="tm-label">Binary Decrement</div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- Popup Overlay -->
+<!-- MAGIC SIMULATION POPUP -->
+<div id="sim-popup" class="magic-overlay">
+  <div class="magic-popup">
+
+    <h2>Choose Simulation Type</h2>
+
+    <button class="magic-btn" onclick="goToPage('Binary Increment.html')">
+      <span class="magic-icon">⚡</span> Binary Increment
+    </button>
+
+    <button class="magic-btn" onclick="goToPage('Uniary Increment.html')">
+      <span class="magic-icon">➕</span> Uniary Increment
+    </button>
+
+    <button class="magic-btn" onclick="goToPage('Binary Addition.html')">
+      <span class="magic-icon">🔢</span> Binary Addition
+    </button>
+
+    <button class="magic-btn" onclick="goToPage('Uniary Addition.html')">
+      <span class="magic-icon">📏</span> Uniary Addition
+    </button>
+
+    <button class="magic-btn special" onclick="goToPage('Palindrome.html')">
+      <span class="magic-icon">🪞</span> Palindrome
+    </button>
+
+    <div class="magic-cancel" onclick="closePopup()">Cancel</div>
+  </div>
+</div>
+<!-- ================= TUTORIAL POPUP ================= -->
+<div id="tutorial-popup" class="magic-overlay" style="display:none;">
+  <div class="magic-popup">
+
+    <h2>Learn Through Videos</h2>
+    <p style="text-align:center; opacity:0.85; margin-bottom:20px;">
+      See computation come alive through visual
+    </p>
+
+    <button class="magic-btn" onclick="openTuringQuestDemo()">
+  🚀 Turing Quest Demo
+</button>
+
+
+    <button class="magic-btn" onclick="openTuringMachineVideo()">
+      <span class="magic-icon">⚙</span> Watch How Turing Machine Works
+    </button>
+
+    <div class="magic-cancel" onclick="closeTutorialPopup()">Close</div>
+  </div>
+</div>
+
+
+<!-- Features Section -->
+<section id="features">
+  <h2 class="features-heading">Everything you need to start the quest</h2>
+  <p class="features-subtitle">Comprehensive tools for learning and exploring formal computation</p>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🎥</div>
+      <div class="feature-title">Free Videos for Reference</div>
+      <ul class="feature-list">
+        <li>Watch videos explaining Turing Machines, DFA, and NFA</li>
+        <li>Step-by-step examples to follow along</li>
+        <li>Covers both theory and practical simulations</li>
+        <li>Helps understand complex concepts visually</li>
+        <li>Optional quizzes to test understanding</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🧩</div>
+      <div class="feature-title">Puzzle-like Simulator</div>
+      <ul class="feature-list">
+        <li>Interactive exercises that challenge students</li>
+        <li>Encourages experimenting with states and transitions</li>
+        <li>Immediate visual feedback on actions</li>
+        <li>Gradually increases in difficulty to build mastery</li>
+        <li>Gamified approach to learning computation</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📄</div>
+      <div class="feature-title">Tape for Any String Input</div>
+      <ul class="feature-list">
+        <li>Load any string you want to test</li>
+        <li>Visualize read/write head movements</li>
+        <li>Observe how your Turing Machine processes inputs</li>
+        <li>Supports multiple examples simultaneously</li>
+        <li>Helps understand step-by-step computation</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">⚠️</div>
+      <div class="feature-title">Error Detection</div>
+      <ul class="feature-list">
+        <li>Highlights invalid transitions instantly</li>
+        <li>Provides suggestions for correction</li>
+        <li>Helps prevent common mistakes</li>
+        <li>Encourages trial-and-error learning</li>
+        <li>Ensures correct FA / TM design</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔗</div>
+      <div class="feature-title">Loops, States, Transitions, Arrows, Labeling</div>
+      <ul class="feature-list">
+        <li>Draw states and loops intuitively</li>
+        <li>Add transitions and label them clearly</li>
+        <li>Visual clarity with arrows and colors</li>
+        <li>Supports complex machine designs</li>
+        <li>Helps students learn diagrammatic representation</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">▶️</div>
+      <div class="feature-title">Run Simulated Finite Automata</div>
+      <ul class="feature-list">
+        <li>Execute your designed machine in real-time</li>
+        <li>Step through each tape movement and transition</li>
+        <li>Observe acceptance or rejection of strings</li>
+        <li>Supports multiple executions for practice</li>
+        <li>Helps reinforce learning via simulation</li>
+      </ul>
+    </div>
+  </div> <!-- END features-grid -->
+</section> <!-- END Everything you need to start the quest -->
+
+<!-- HOW TO / LEARN SECTION (comes FIRST) -->
+<section id="howto" style="padding:90px 28px 100px;">
+  
+  <h2 class="features-heading">
+    Learning to Use Turing Quest
+  </h2>
+
+  <p class="features-subtitle">
+    Simple steps to design, run, and understand Turing Machines visually
+  </p>
+
+  <div class="features-grid">
+
+    <!-- STEP 1 -->
+    <div class="feature-card">
+      <div class="feature-icon">🚀</div>
+      <div class="feature-title">Start Your Quest</div>
+      <p style="color:rgba(255,255,255,0.75)">
+        Click <b>Start Simulating</b> and choose the machine you want to explore.
+      </p>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="feature-card">
+      <div class="feature-icon">🔵</div>
+      <div class="feature-title">Understand States & Tape</div>
+      <p style="color:rgba(255,255,255,0.75)">
+        States control logic, and the tape holds symbols your machine reads and writes.
+      </p>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="feature-card">
+      <div class="feature-icon">✏️</div>
+      <div class="feature-title">Create Transitions</div>
+      <p style="color:rgba(255,255,255,0.75)">
+        Click states, fill the popup, and define read, write, and move actions.
+      </p>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="feature-card">
+      <div class="feature-icon">📼</div>
+      <div class="feature-title">Load Input</div>
+      <p style="color:rgba(255,255,255,0.75)">
+        Enter your string on the tape and set the starting position.
+      </p>
+    </div>
+
+    <!-- STEP 5 -->
+    <div class="feature-card">
+      <div class="feature-icon">▶️</div>
+      <div class="feature-title">Run & Observe</div>
+      <p style="color:rgba(255,255,255,0.75)">
+        Run the machine and watch states and tape change step by step.
+      </p>
+    </div>
+
+    <!-- STEP 6 -->
+    <div class="feature-card">
+      <div class="feature-icon">🎯</div>
+      <div class="feature-title">Learn by Experimenting</div>
+      <p style="color:rgba(255,255,255,0.75)">
+        Fix errors, try again, and learn by teaching the machine.
+      </p>
+    </div>
+
+  </div>
+</section>
+
+<!-- LEARN THE CORE CONCEPTS (comes AFTER) -->
+<section id="learn" class="learn-section">
+  <h2 class="learn-title">Learn the Core Concepts</h2>
+  <p class="learn-subtitle">
+    Understand the foundations of computation through simple visual ideas
+  </p>
+
+  <div class="learn-grid">
+
+    <div class="learn-card">
+      <div class="learn-icon">🤖</div>
+      <h3>Turing Machine</h3>
+      <p>
+        A Turing Machine is a simple mathematical model that explains how a
+        computer works. It uses a tape, a head, and states to read, write,
+        and move step-by-step to solve problems.
+      </p>
+    </div>
+
+    <div class="learn-card">
+      <div class="learn-icon">🔁</div>
+      <h3>Palindromes</h3>
+      <p>
+        A palindrome is a string that reads the same forward and backward.
+        The machine checks symbols from both ends to decide whether the
+        input is symmetric.
+      </p>
+    </div>
+
+    <div class="learn-card">
+      <div class="learn-icon">➕</div>
+      <h3>Binary Addition</h3>
+      <p>
+        Binary addition works with 0s and 1s. The machine simulates how
+        computers add numbers using carry and simple state transitions.
+      </p>
+    </div>
+
+    <div class="learn-card">
+      <div class="learn-icon">⬆️</div>
+      <h3>Binary Increment</h3>
+      <p>
+        Binary increment adds 1 to a binary number. The machine flips bits
+        from right to left until the addition is complete.
+      </p>
+    </div>
+
+    <div class="learn-card">
+      <div class="learn-icon">🟦</div>
+      <h3>Unary Addition</h3>
+      <p>
+        Unary addition uses only one symbol (like 1). Numbers are added by
+        combining symbols, making the logic very easy to visualize.
+      </p>
+    </div>
+
+    <div class="learn-card">
+      <div class="learn-icon">🚀</div>
+      <h3>Unary Increment</h3>
+      <p>
+        Unary increment increases a number by adding one more symbol to the
+        tape. It shows how even simple rules can compute values.
+      </p>
+    </div>
+
+  </div>
+</section>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+  /* ================= SIMULATION POPUP ================= */
+
+  const startBtn = document.getElementById('startBtn');
+  const simPopup = document.getElementById('sim-popup');
+
+  if (startBtn) {
+    startBtn.addEventListener('click', () => {
+      simPopup.style.display = 'flex';
+    });
+  }
+
+  window.closePopup = function () {
+    simPopup.style.display = 'none';
+  };
+
+  window.goToPage = function (page) {
+    window.location.href = page;
+  };
+
+  /* ================= TUTORIAL POPUP ================= */
+
+  const tutorialBtn   = document.getElementById('tutorialBtn');
+  const tutorialPopup = document.getElementById('tutorial-popup');
+  const videoEl       = document.getElementById('tutorial-video');
+
+  if (tutorialBtn) {
+    tutorialBtn.addEventListener('click', () => {
+      tutorialPopup.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    });
+  }
+
+  window.closeTutorialPopup = function () {
+    tutorialPopup.style.display = 'none';
+    document.body.style.overflow = 'auto';
+
+    if (videoEl) {
+      videoEl.pause();
+      videoEl.currentTime = 0;
+      videoEl.src = "";
+    }
+  };
+
+  /* ================= VIDEO ACTION ================= */
+
+  window.openTuringMachineVideo = function () {
+    if (!videoEl) return;
+
+    videoEl.src = "videos/Video_Project1.mp4"; // ✅ correct relative path
+    videoEl.style.display = "block";
+    videoEl.play();
+  };
+
+  /* ================= DEMO BUTTON ================= */
+
+  window.openTuringQuestDemo = function () {
+    alert("🚀 Turing Quest Demo will be added soon!");
+  };
+
+});
+
+/* ================= ACCORDION ================= */
+function toggleConcept(btn){
+  const item = btn.parentElement;
+
+  document.querySelectorAll('.concept-item').forEach(i => {
+    if(i !== item) i.classList.remove('open');
+  });
+
+  item.classList.toggle('open');
+}
+
+/* ================= SCROLL + OPEN ================= */
+function scrollToConcept(index = null){
+  const section = document.getElementById('learn-concepts');
+  if(!section) return;
+
+  section.scrollIntoView({ behavior: 'smooth' });
+
+  if(index !== null){
+    const items = document.querySelectorAll('.concept-item');
+    if(items[index]){
+      setTimeout(() => {
+        items[index].classList.add('open');
+      }, 500);
+    }
+  }
+}
+</script>
+</body>
+</html>
